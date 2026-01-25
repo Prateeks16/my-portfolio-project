@@ -1,0 +1,31 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=Manrope:wght@300;400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background-color: #ECEBE9;
+  color: #1A1A1A;
+  font-family: 'Manrope', sans-serif;
+  overflow-x: hidden; /* Horizontal scroll rokne ke liye */
+}
+
+/* Custom Class for Big Headings */
+.heading-serif {
+  font-family: 'Playfair Display', serif;
+}
+
+/* Smooth Scrolling */
+html {
+  scroll-behavior: smooth;
+}
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
