@@ -1,11 +1,11 @@
 import React from 'react';
-import Navbar from '/src/components/Navbar.jsx';
-import Hero from '/src/components/Hero.jsx';
+import Navbar from './components/Navbar';
+import Hero from './components/Hero';
 import Work from './components/Work';
-import Experience from '/src/components/Experience'; 
-import Achievements from '/src/components/Achievements';
-import About from '/src/components/About.jsx';
-import Footer from '/src/components/Footer';
+import Experience from './components/Experience'; 
+import Achievements from './components/Achievements';
+import About from './components/About';
+import Footer from './components/Footer';
 
 
 
