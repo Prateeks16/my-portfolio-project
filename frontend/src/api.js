@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Aapka Django Backend URL
-export const API_BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+export const API_BASE_URL = "https://my-portfolio-backend-awei.onrender.com" || "http://127.0.0.1:8000";
 
 // Axios instance
 const api = axios.create({
