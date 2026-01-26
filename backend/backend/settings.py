@@ -1,6 +1,6 @@
 """
 Django settings for backend project.
-Updated for Environment Variables (.env)
+Fixed for Windows & Render Deployment
 """
 
 import os
@@ -10,12 +10,16 @@ from pathlib import Path
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Load environment variables from .env file (Local Development ke liye)
+# Load environment variables from .env file
+# Try block isliye taaki Render par error na aaye agar dotenv installed na ho
 try:
     from dotenv import load_dotenv
-    load_dotenv(BASE_DIR / '.env')
+    # Explicitly path bataya hai taaki confusion na ho
+    env_path = BASE_DIR / '.env'
+    if env_path.exists():
+        load_dotenv(env_path)
 except ImportError:
-    pass  # Production (Render) par dotenv ki zaroorat nahi hoti
+    pass
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
@@ -24,20 +28,22 @@ except ImportError:
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-fallback-key')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-# Agar environment variable 'True' hai to Debug On, varna Off (Production Safe)
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://my-portfolio-backend-awei.onrender.com",
+    "http://localhost:5173",
+]
 
 
 # CORS settings
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",  # Vite default port
     "http://127.0.0.1:5173",
-    # Jab Vercel par deploy ho jaye, uska URL yahan add karein:
-    # "https://your-portfolio.vercel.app",
+    # Jab Vercel URL aa jaye, usse yahan add karna mat bhulna
 ]
-# Development ke liye sab allow kar sakte hain (Optional)
 CORS_ALLOW_ALL_ORIGINS = True
 
 
@@ -49,7 +55,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     
-    'whitenoise.runserver_nostatic', # Dev mein static files ke liye
+    'whitenoise.runserver_nostatic', 
     'django.contrib.staticfiles',
 
     # Third-party
@@ -65,7 +71,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware', 
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware', # <-- Production Static Files
+    'whitenoise.middleware.WhiteNoiseMiddleware', 
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -94,17 +100,25 @@ TEMPLATES = [
 WSGI_APPLICATION = 'backend.wsgi.application'
 
 
-# Database
-# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
+# --- DATABASE SETTINGS (FIXED) ---
 
+# 1. Default: Local SQLite (Ye Windows par bina error ke chalega)
 DATABASES = {
-    'default': dj_database_url.config(
-        # Agar DATABASE_URL (.env ya Render) mein hai to wo use karega (Postgres)
-        # Nahi to Local SQLite use karega
-        default='sqlite:///' + str(BASE_DIR / 'db.sqlite3'),
-        conn_max_age=600
-    )
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }
 }
+
+# 2. Override: Agar DATABASE_URL milta hai (.env ya Render se), toh Postgres use karo
+database_url = os.environ.get("DATABASE_URL")
+
+if database_url:
+    DATABASES['default'] = dj_database_url.parse(
+        database_url,
+        conn_max_age=600,
+        conn_health_checks=True,
+    )
 
 
 # Password validation
@@ -133,14 +147,13 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
-# --- CLOUDINARY SETTINGS (FROM .ENV) ---
+# --- CLOUDINARY SETTINGS ---
 CLOUDINARY_STORAGE = {
     'CLOUD_NAME': os.environ.get('CLOUD_NAME'),
     'API_KEY': os.environ.get('CLOUD_API_KEY'),
     'API_SECRET': os.environ.get('CLOUD_API_SECRET')
 }
 
-# Media files ke liye Cloudinary use karein
 STORAGES = {
     "default": {
         "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
