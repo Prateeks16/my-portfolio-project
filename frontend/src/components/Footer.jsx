@@ -21,7 +21,7 @@ const Footer = () => {
     try {
       await api.post('/contact/', {
         ...formData,
-        subject: "New Message from Portfolio Footer" // Subject auto-set
+        subject: "New Message from Portfolio Footer" 
       });
       setStatus('success');
       setFormData({ name: '', email: '', message: '' });
@@ -34,7 +34,8 @@ const Footer = () => {
   };
 
   return (
-    <footer className="bg-[#1C1C1C] text-[#ECEBE9] py-20 px-6 md:px-12 lg:px-24 rounded-t-[3rem] mt-20">
+    // 👇 Yahan id="contact" add kiya hai taaki Navbar link kaam kare
+    <footer id="contact" className="bg-[#1C1C1C] text-[#ECEBE9] py-20 px-6 md:px-12 lg:px-24 rounded-t-[3rem] mt-20">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-24">
         
         {/* --- LEFT SIDE: Info & Social Links --- */}
@@ -56,22 +57,16 @@ const Footer = () => {
           <div className="mt-12">
             <h3 className="text-xs font-bold uppercase tracking-widest text-stone-500 mb-6">Connect with me</h3>
             <div className="flex gap-6">
-              {/* LinkedIn */}
               <SocialLink href="https://linkedin.com/in/Prateeks16" icon={<Linkedin size={24} />} label="LinkedIn" />
-              
-              {/* Instagram */}
               <SocialLink href="https://instagram.com/prateek.17" icon={<Instagram size={24} />} label="Instagram" />
-              
-              {/* GitHub (Optional but good for dev) */}
               <SocialLink href="https://github.com/Prateeks16" icon={<Github size={24} />} label="GitHub" />
             </div>
           </div>
         </div>
 
-        {/* --- RIGHT SIDE: Contact Form (Dark Theme) --- */}
+        {/* --- RIGHT SIDE: Contact Form --- */}
         <div className="bg-[#2A2A2A] p-8 md:p-10 rounded-3xl border border-white/5 relative overflow-hidden">
           
-          {/* Success Overlay */}
           {status === 'success' && (
             <div className="absolute inset-0 bg-[#2A2A2A] z-10 flex flex-col items-center justify-center text-center animate-fadeIn p-8">
               <CheckCircle size={48} className="text-green-400 mb-4" />
@@ -128,7 +123,6 @@ const Footer = () => {
   );
 };
 
-// Helper for Social Icons
 const SocialLink = ({ href, icon, label }) => (
   <a 
     href={href} 
