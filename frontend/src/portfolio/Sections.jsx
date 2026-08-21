@@ -244,22 +244,27 @@ const ProjectBlock = ({ project, index }) => {
   const image = getImageUrl(project.image);
   const flip = index % 2 === 1;
 
+  // Backend and infrastructure work has nothing to screenshot. An empty grey box
+  // reads as a broken image, so those projects run as full-width text instead.
   return (
-    <article className="grid items-center gap-8 md:grid-cols-2 md:gap-12">
-      <div className={cx('order-1', flip && 'md:order-2')}>
-        {image ? (
+    <article
+      className={cx(
+        'grid items-center gap-8 md:gap-12',
+        image && 'md:grid-cols-2'
+      )}
+    >
+      {image && (
+        <div className={cx('order-1', flip && 'md:order-2')}>
           <img
             src={image}
             alt={`${project.title} interface`}
             loading="lazy"
             className="aspect-[4/3] w-full rounded-lg border border-line object-cover shadow-panel"
           />
-        ) : (
-          <div className="aspect-[4/3] w-full rounded-lg border border-line bg-surface-sunk" />
-        )}
-      </div>
+        </div>
+      )}
 
-      <div className={cx('order-2', flip && 'md:order-1')}>
+      <div className={cx('order-2', image && flip && 'md:order-1')}>
         <h3 className="heading-serif text-[1.75rem] leading-tight text-ink md:text-[2.25rem]">
           {project.title}
         </h3>

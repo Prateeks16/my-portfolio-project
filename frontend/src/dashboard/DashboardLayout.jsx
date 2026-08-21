@@ -17,20 +17,89 @@ import {
   X,
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
+import { prefetch } from '../lib/useApi';
 import { cx, initials } from '../lib/format';
 
+// `chunk` pulls the lazy route bundle and `data` warms its first request, both
+// on hover. By the time the click lands there is usually nothing left to wait for.
 const NAV = [
-  { to: '/dashboard', label: 'Overview', icon: LayoutGrid, end: true },
-  { to: '/dashboard/leads', label: 'Leads', icon: Users },
-  { to: '/dashboard/outreach', label: 'Outreach', icon: Send },
-  { to: '/dashboard/templates', label: 'Templates', icon: Mail },
-  { to: '/dashboard/inbox', label: 'Inbox', icon: Inbox },
-  { to: '/dashboard/tasks', label: 'Tasks', icon: CheckSquare },
-  { to: '/dashboard/analytics', label: 'Analytics', icon: BarChart3 },
-  { to: '/dashboard/content', label: 'Content', icon: FileText },
-  { to: '/dashboard/github', label: 'GitHub', icon: Github },
-  { to: '/dashboard/settings', label: 'Settings', icon: Settings },
+  {
+    to: '/dashboard',
+    label: 'Overview',
+    icon: LayoutGrid,
+    end: true,
+    chunk: () => import('./pages/Overview'),
+    data: ['/crm/summary/', '/crm/leads/', '/crm/emails/?status=draft'],
+  },
+  {
+    to: '/dashboard/leads',
+    label: 'Leads',
+    icon: Users,
+    chunk: () => import('./pages/Leads'),
+    data: ['/crm/leads/'],
+  },
+  {
+    to: '/dashboard/outreach',
+    label: 'Outreach',
+    icon: Send,
+    chunk: () => import('./pages/Outreach'),
+    data: ['/crm/emails/', '/crm/emails/mail_status/'],
+  },
+  {
+    to: '/dashboard/templates',
+    label: 'Templates',
+    icon: Mail,
+    chunk: () => import('./pages/Templates'),
+    data: ['/crm/templates/'],
+  },
+  {
+    to: '/dashboard/inbox',
+    label: 'Inbox',
+    icon: Inbox,
+    chunk: () => import('./pages/Inbox'),
+    data: ['/crm/inbox/'],
+  },
+  {
+    to: '/dashboard/tasks',
+    label: 'Tasks',
+    icon: CheckSquare,
+    chunk: () => import('./pages/Tasks'),
+    data: ['/crm/tasks/', '/crm/leads/'],
+  },
+  {
+    to: '/dashboard/analytics',
+    label: 'Analytics',
+    icon: BarChart3,
+    chunk: () => import('./pages/Analytics'),
+    data: ['/crm/analytics/?days=30'],
+  },
+  {
+    to: '/dashboard/content',
+    label: 'Content',
+    icon: FileText,
+    chunk: () => import('./pages/Content'),
+    data: ['/crm/manage/profile/'],
+  },
+  {
+    to: '/dashboard/github',
+    label: 'GitHub',
+    icon: Github,
+    chunk: () => import('./pages/GitHubPage'),
+    data: ['/crm/github/'],
+  },
+  {
+    to: '/dashboard/settings',
+    label: 'Settings',
+    icon: Settings,
+    chunk: () => import('./pages/Settings'),
+    data: ['/crm/emails/mail_status/'],
+  },
 ];
+
+const warm = (entry) => {
+  entry.chunk?.().catch(() => {});
+  entry.data?.forEach(prefetch);
+};
 
 const DashboardLayout = () => {
   const { logout, username } = useAuth();
@@ -62,11 +131,15 @@ const DashboardLayout = () => {
       </div>
 
       <nav aria-label="Dashboard" className="flex-1 space-y-0.5 overflow-y-auto px-2.5 py-3.5">
-        {NAV.map(({ to, label, icon: Icon, end }) => (
+        {NAV.map((entry) => {
+          const { to, label, icon: Icon, end } = entry;
+          return (
           <NavLink
             key={to}
             to={to}
             end={end}
+            onMouseEnter={() => warm(entry)}
+            onFocus={() => warm(entry)}
             onClick={() => setDrawerOpen(false)}
             className={({ isActive }) =>
               cx(
@@ -85,7 +158,8 @@ const DashboardLayout = () => {
               </>
             )}
           </NavLink>
-        ))}
+          );
+        })}
       </nav>
 
       <div className="border-t border-white/[0.08] p-2.5">

@@ -16,3 +16,7 @@ python manage.py migrate
 # exists you can clear CRM_ADMIN_PASSWORD from the environment; re-adding it later
 # is also how you reset a forgotten password.
 python manage.py bootstrap_crm
+
+# Add resume projects that are not in the database yet. Matches on title with
+# get_or_create, so it never overwrites anything edited in the CRM afterwards.
+python manage.py seed_projects
