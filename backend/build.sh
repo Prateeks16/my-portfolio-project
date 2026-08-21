@@ -20,3 +20,9 @@ python manage.py bootstrap_crm
 # Add resume projects that are not in the database yet. Matches on title with
 # get_or_create, so it never overwrites anything edited in the CRM afterwards.
 python manage.py seed_projects
+
+# Bring the internship pipeline onto the board. Both commands match on
+# (company, role) and skip rows that already exist, so re-running on every
+# deploy cannot duplicate anything or undo a stage you moved by hand.
+python manage.py import_pipeline
+python manage.py import_batch2027
