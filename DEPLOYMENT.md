@@ -57,14 +57,23 @@ there. If you later use a domain that is *not* `prateeks16.in`, add it to
    | `EMAIL_HOST_PASSWORD` | only to send mail | Gmail **App Password** |
    | `DEFAULT_FROM_EMAIL` | optional | defaults to `EMAIL_HOST_USER` |
 
-3. Create your dashboard login. In the Render shell:
+3. Create your dashboard login **without a shell** — Render's shell is a paid
+   feature, so `build.sh` does this for you on every deploy.
 
-   ```
-   python manage.py bootstrap_crm --username prateek --password 'a-strong-password'
-   ```
+   Add two environment variables in the Render dashboard, then redeploy:
 
-   This also seeds the six outreach templates. It is safe to re-run: everything is
-   `get_or_create`, so it never overwrites edits.
+   | Variable | Value |
+   |---|---|
+   | `CRM_ADMIN_USERNAME` | the username you want |
+   | `CRM_ADMIN_PASSWORD` | a strong password you choose |
+
+   The build runs `python manage.py bootstrap_crm`, which creates the account and
+   seeds the six outreach templates. Everything it does is `get_or_create`, so it
+   is safe on every deploy and never overwrites your edits.
+
+   Once the account exists you can delete `CRM_ADMIN_PASSWORD` from the
+   environment. Setting it again later and redeploying is also how you reset a
+   forgotten password.
 
 ### Frontend (Vercel)
 

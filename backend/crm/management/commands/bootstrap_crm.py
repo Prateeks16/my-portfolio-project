@@ -7,6 +7,7 @@ Safe to run repeatedly - everything is get_or_create, so it never clobbers edits
 """
 
 import json
+import os
 import urllib.request
 
 from django.contrib.auth.models import User
@@ -139,9 +140,11 @@ class Command(BaseCommand):
     help = 'Create the CRM admin user, seed outreach templates, optionally pull live content.'
 
     def add_arguments(self, parser):
-        parser.add_argument('--username', default='prateek')
-        parser.add_argument('--password', default=None)
-        parser.add_argument('--email', default='prateeksahu529pvt@gmail.com')
+        # Values fall back to the environment so this can run from build.sh on
+        # hosts where an interactive shell is a paid feature.
+        parser.add_argument('--username', default=os.environ.get('CRM_ADMIN_USERNAME', 'prateek'))
+        parser.add_argument('--password', default=os.environ.get('CRM_ADMIN_PASSWORD'))
+        parser.add_argument('--email', default=os.environ.get('CRM_ADMIN_EMAIL', 'prateeksahu529pvt@gmail.com'))
         parser.add_argument(
             '--pull-live',
             action='store_true',
@@ -179,8 +182,9 @@ class Command(BaseCommand):
         if not password:
             self.stdout.write(
                 self.style.WARNING(
-                    'No --password given, so no admin user was created. '
-                    'Re-run with --password to create "%s".' % username
+                    'No password supplied (--password or CRM_ADMIN_PASSWORD), so no '
+                    'admin user was created. Set CRM_ADMIN_PASSWORD to create "%s".'
+                    % username
                 )
             )
             return
