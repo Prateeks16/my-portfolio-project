@@ -10,7 +10,7 @@ import {
   Minus,
   Plus,
 } from 'lucide-react';
-import { cx, formatDate, parseTechStack, toBullets } from '../lib/format';
+import { cx, formatDate, formatDateRange, parseTechStack, toBullets } from '../lib/format';
 import { trackEvent } from '../lib/track';
 import { getImageUrl } from './usePortfolio';
 
@@ -385,8 +385,7 @@ export const Experience = ({ experiences, loading }) => (
           >
             <div className="md:col-span-3">
               <p className="text-sm text-white/50">
-                {formatDate(role.start_date)} —{' '}
-                {role.end_date ? formatDate(role.end_date) : 'present'}
+                {formatDateRange(role.start_date, role.end_date)}
               </p>
               {role.location && (
                 <p className="mt-1 text-sm text-white/55">{role.location}</p>

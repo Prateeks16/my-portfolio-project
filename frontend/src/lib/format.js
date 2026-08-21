@@ -58,6 +58,28 @@ const DIVISIONS = [
  * The magnitude checks use the absolute value so a future timestamp is never
  * mistaken for "just now".
  */
+/**
+ * Resume-style date range at month granularity.
+ *
+ * A one-month engagement reads badly as "26 Aug 2025 - 31 Aug 2025", so a range
+ * that starts and ends in the same month collapses to just that month.
+ */
+export const formatDateRange = (start, end) => {
+  const month = (value) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    return date.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+  };
+
+  const from = start ? month(start) : null;
+  if (!from) return '—';
+  if (!end) return `${from} — present`;
+
+  const to = month(end);
+  if (!to) return `${from} — present`;
+  return from === to ? from : `${from} — ${to}`;
+};
+
 export const relativeTime = (value) => {
   if (!value) return '—';
   const then = new Date(value).getTime();
