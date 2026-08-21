@@ -1,6 +1,7 @@
 export const STAGES = [
   { key: 'new', label: 'New', tone: 'neutral' },
   { key: 'contacted', label: 'Contacted', tone: 'info' },
+  { key: 'applied', label: 'Applied', tone: 'info' },
   { key: 'replied', label: 'Replied', tone: 'info' },
   { key: 'interviewing', label: 'Interviewing', tone: 'warning' },
   { key: 'offer', label: 'Offer', tone: 'success' },
@@ -16,6 +17,7 @@ export const SOURCES = [
   ['referral', 'Referral'],
   ['job_board', 'Job Board'],
   ['github', 'GitHub'],
+  ['job_scan', 'Automated Job Scan'],
   ['email', 'Inbound Email'],
   ['manual', 'Manually Added'],
   ['other', 'Other'],

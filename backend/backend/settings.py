@@ -224,5 +224,8 @@ DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
 
 
 # --- CRM ---
+# Single-purpose token for the scheduled job scan. Unset means ingest is closed.
+CRM_INGEST_TOKEN = os.environ.get('CRM_INGEST_TOKEN', '')
+
 GITHUB_USERNAME = os.environ.get('GITHUB_USERNAME', 'Prateeks16')
 PORTFOLIO_URL = os.environ.get('PORTFOLIO_URL', 'https://prateeks16.in')

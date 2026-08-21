@@ -8,6 +8,7 @@ class Lead(models.Model):
     STAGE_CHOICES = [
         ('new', 'New'),
         ('contacted', 'Contacted'),
+        ('applied', 'Applied'),
         ('replied', 'Replied'),
         ('interviewing', 'Interviewing'),
         ('offer', 'Offer'),
@@ -20,13 +21,14 @@ class Lead(models.Model):
         ('referral', 'Referral'),
         ('job_board', 'Job Board'),
         ('github', 'GitHub'),
+        ('job_scan', 'Automated Job Scan'),
         ('email', 'Inbound Email'),
         ('manual', 'Manually Added'),
         ('other', 'Other'),
     ]
 
     name = models.CharField(max_length=200)
-    email = models.EmailField()
+    email = models.EmailField(blank=True)
     company = models.CharField(max_length=200, blank=True)
     role = models.CharField(max_length=200, blank=True)
     linkedin_url = models.URLField(blank=True)
@@ -39,6 +41,11 @@ class Lead(models.Model):
     score = models.IntegerField(default=50)
     tags = models.CharField(max_length=300, blank=True, help_text='Comma separated')
     notes = models.TextField(blank=True)
+
+    # Where the posting came from, for rows created by the scheduled job scan.
+    apply_url = models.URLField(blank=True)
+    posted_at = models.DateField(blank=True, null=True)
+    external_id = models.CharField(max_length=200, blank=True, db_index=True)
 
     last_contacted_at = models.DateTimeField(blank=True, null=True)
     next_follow_up_at = models.DateTimeField(blank=True, null=True)

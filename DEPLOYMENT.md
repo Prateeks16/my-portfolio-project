@@ -53,6 +53,7 @@ there. If you later use a domain that is *not* `prateeks16.in`, add it to
    | `CLOUD_NAME`, `CLOUD_API_KEY`, `CLOUD_API_SECRET` | yes | Cloudinary, already set |
    | `PORTFOLIO_URL` | recommended | `https://prateeks16.in` |
    | `EXTRA_ALLOWED_ORIGINS` | optional | extra origins, comma separated |
+   | `CRM_INGEST_TOKEN` | for the job scan | long random string; unset closes ingest |
    | `EMAIL_HOST_USER` | only to send mail | Gmail address |
    | `EMAIL_HOST_PASSWORD` | only to send mail | Gmail **App Password** |
    | `DEFAULT_FROM_EMAIL` | optional | defaults to `EMAIL_HOST_USER` |
@@ -119,6 +120,43 @@ default. GitHub may disable scheduled workflows on repositories with no activity
 
 If you later want to leave Render entirely, the backend is a plain Django app with a
 `DATABASE_URL` — Fly.io and Railway both run it without code changes.
+
+---
+
+## Feeding the weekday job scan into the CRM
+
+The Cowork scheduled task *Weekday internship scan — SDE + AI/ML* runs Mon–Fri at
+09:00 IST in a cloud sandbox. Each run starts a fresh session with no memory, so it
+cannot hold a login. It posts to a single-purpose endpoint instead:
+
+```
+POST /api/crm/ingest/opportunities/
+X-Ingest-Token: <CRM_INGEST_TOKEN>
+
+{"items": [
+  {"company": "Acme", "role": "Backend Engineer (New Grad 2027)",
+   "apply_url": "https://...", "location": "Remote",
+   "stack": ["Go", "Postgres"], "stage": "Lead",
+   "posted_at": "2026-08-18", "deadline": "2026-09-05T09:00:00Z"}
+]}
+```
+
+Why a separate token rather than a JWT: this endpoint can only create or update
+job-scan leads. It cannot read your pipeline, send mail, or change anything on the
+public site, so a token sitting in a task prompt is a much smaller blast radius than
+a login would be. Leave `CRM_INGEST_TOKEN` unset and ingest is closed entirely.
+
+Two behaviours worth knowing:
+
+- Rows match on **(company, role)**, so the same posting seen on five consecutive
+  mornings updates one card instead of creating five.
+- A lead already at Contacted, Applied, Replied, Interviewing, Offer, Won or Lost
+  **keeps its stage**. The scan reports postings; it never drags your progress
+  backwards.
+
+Scanned postings land on the Leads board with source *Automated job scan*, an
+external link to the posting, and the stack as tags — which is what feeds the
+Stack demand chart under Leads → Insights.
 
 ---
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { LayoutGrid, List, Plus, Search, Users } from 'lucide-react';
+import { BarChart3, ExternalLink, LayoutGrid, List, Plus, Search, Users } from 'lucide-react';
 import api from '../../api';
 import { useApi, apiError } from '../../lib/useApi';
 import { STAGES, SOURCES, cx, formatDate, initials, relativeTime, stageMeta } from '../../lib/format';
@@ -18,6 +18,7 @@ import {
   Select,
   Textarea,
 } from '../components/ui';
+import PipelineInsights from '../components/PipelineInsights';
 
 const BLANK = {
   name: '',
@@ -132,6 +133,7 @@ const Leads = () => {
           {[
             ['board', LayoutGrid, 'Board'],
             ['table', List, 'Table'],
+            ['insights', BarChart3, 'Insights'],
           ].map(([key, Icon, label]) => (
             <button
               key={key}
@@ -191,6 +193,8 @@ const Leads = () => {
         </Panel>
       ) : view === 'board' ? (
         <Board leads={leads} onMove={moveStage} movingId={movingId} />
+      ) : view === 'insights' ? (
+        <PipelineInsights leads={leads} />
       ) : (
         <LeadTable leads={leads} />
       )}
@@ -306,6 +310,17 @@ const BoardCard = ({ lead, onMove, settling }) => (
           </option>
         ))}
       </select>
+      {lead.apply_url && (
+        <a
+          href={lead.apply_url}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={`Open the posting for ${lead.role || lead.company}`}
+          className="rounded-control border border-line-strong px-2 py-1 text-ink-secondary transition-colors duration-150 hover:bg-surface-sunk hover:text-ink"
+        >
+          <ExternalLink size={13} />
+        </a>
+      )}
       <Link
         to={`/dashboard/outreach/compose?lead=${lead.id}`}
         className="rounded-control border border-line-strong px-2 py-1 text-label font-medium text-ink transition-colors duration-150 hover:bg-surface-sunk"
