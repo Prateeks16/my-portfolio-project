@@ -379,6 +379,28 @@ def analytics(request):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
+def ingest_status(request):
+    """Whether the job-scan ingest token is configured.
+
+    Reports only a boolean, never the token, and requires a login to read - so
+    it confirms the wiring without becoming an oracle for probing the secret.
+    """
+    from .models import Lead
+
+    latest = (
+        Lead.objects.filter(source='job_scan').order_by('-created_at').first()
+    )
+    return Response(
+        {
+            'configured': bool(getattr(settings, 'CRM_INGEST_TOKEN', '')),
+            'scanned_leads': Lead.objects.filter(source='job_scan').count(),
+            'last_ingest_at': latest.created_at if latest else None,
+        }
+    )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def github(request):
     username = request.query_params.get('username', 'Prateeks16')
     return Response(github_stats(username))

@@ -1,5 +1,6 @@
 import React from 'react';
 import { CheckCircle2, ExternalLink, XCircle } from 'lucide-react';
+import { relativeTime } from '../../lib/format';
 import { API_BASE_URL } from '../../api';
 import { useApi } from '../../lib/useApi';
 import { useAuth } from '../../lib/auth';
@@ -21,6 +22,7 @@ const ENV_VARS = [
 const Settings = () => {
   const { username } = useAuth();
   const mail = useApi('/crm/emails/mail_status/');
+  const ingest = useApi('/crm/ingest-status/');
   const configured = mail.data?.configured;
 
   return (
@@ -88,6 +90,48 @@ const Settings = () => {
         </Panel>
 
         <div className="space-y-5">
+          <Panel>
+            <PanelHeader
+              title="Job scan ingest"
+              meta="Whether the weekday scan can write into the pipeline"
+            />
+            <div className="p-4">
+              {ingest.loading ? (
+                <p className="text-body text-ink-tertiary">Checking…</p>
+              ) : ingest.data?.configured ? (
+                <div className="flex items-start gap-2.5 rounded-control border border-success/25 bg-success-bg px-3.5 py-3">
+                  <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-success" />
+                  <p className="text-body leading-relaxed text-success">
+                    Ingest token is set. The scan can post postings straight onto the
+                    board.
+                    {ingest.data.scanned_leads > 0 ? (
+                      <>
+                        {' '}
+                        {ingest.data.scanned_leads} scanned lead
+                        {ingest.data.scanned_leads === 1 ? '' : 's'} so far, most recent{' '}
+                        {relativeTime(ingest.data.last_ingest_at)}.
+                      </>
+                    ) : (
+                      ' Nothing has arrived yet — the first run will change that.'
+                    )}
+                  </p>
+                </div>
+              ) : (
+                <div className="flex items-start gap-2.5 rounded-control border border-warning/25 bg-warning-bg px-3.5 py-3">
+                  <XCircle size={16} className="mt-0.5 shrink-0 text-warning" />
+                  <p className="text-body leading-relaxed text-warning">
+                    No ingest token set, so the endpoint refuses everything. Add
+                    <code className="mx-1 rounded bg-warning/10 px-1 py-0.5 text-label font-semibold">
+                      CRM_INGEST_TOKEN
+                    </code>
+                    to the backend environment and use the same value in the scheduled
+                    task.
+                  </p>
+                </div>
+              )}
+            </div>
+          </Panel>
+
           <Panel>
             <PanelHeader title="Connection" />
             <dl className="divide-y divide-line text-body">

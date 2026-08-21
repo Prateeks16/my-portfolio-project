@@ -26,6 +26,7 @@ urlpatterns = [
     path('ingest/opportunities/', ingest.ingest_opportunities, name='ingest-opportunities'),
     path('track/', views.track, name='track'),
     path('analytics/', views.analytics, name='analytics'),
+    path('ingest-status/', views.ingest_status, name='ingest-status'),
     path('github/', views.github, name='github'),
     path('summary/', views.dashboard_summary, name='dashboard-summary'),
     path('', include(router.urls)),
