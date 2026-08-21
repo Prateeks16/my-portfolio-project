@@ -1,11 +1,11 @@
 {
-  "generatedAt": "2026-08-21T11:05:50.801Z",
+  "generatedAt": "2026-08-21T15:41:53.342Z",
   "profile": {
     "id": 1,
     "full_name": "Prateek Sahu",
     "tagline": "ML & Backend Developer",
     "bio": "Computer Science undergraduate focused on backend development and applied AI. Experienced in building end-to-end systems involving NLP, data processing, and scalable APIs. Strong at problem-solving, rapid learning, and execution in competitive environments, with proven performance in large-scale college competitions.",
-    "email": "prateeksahu529pvt@gmail.com",
+    "email": "prateeks16.outreach@gmail.com",
     "phone": "6267066739",
     "location": "Greater Noida, Uttar Pradesh, India",
     "github_url": "https://github.com/Prateeks16",
@@ -14,6 +14,39 @@
     "profile_picture": "https://res.cloudinary.com/dnkzf5hvi/image/upload/v1/media/profile_pictures/WhatsApp_Image_2026-01-22_at_6.21.13_PM_dpnccr"
   },
   "projects": [
+    {
+      "id": 5,
+      "title": "Cappy — Hinglish AI Caption Studio",
+      "short_description": "A browser-based AI caption editor for ten Indian languages, merging two speech-recognition engines into per-word captions and rendering video entirely client-side.",
+      "description": "Cappy is a caption studio that runs in the browser. It merges dual ASR engines — Sarvam for text and Gladia for timings — using Needleman–Wunsch sequence alignment, then applies Devanagari–Latin transliteration to produce accurate per-word captions across 10 Indian languages.\n\nThe render pipeline carries no server cost: Remotion drives the preview, captions are burned in on canvas, and ffmpeg.wasm transcodes the final MP4 in the browser rather than on a backend.\n\nOn top of that sits a CapCut-style timeline editor with 32 templates. It is deployed on Vercel, with serverless functions used only as thin proxies to keep API keys off the client.",
+      "tech_stack": "[\"Next.js\", \"React\", \"Remotion\", \"FFmpeg (WASM)\", \"Vercel\"]",
+      "github_url": "",
+      "live_demo_url": "",
+      "image": null,
+      "created_at": "2026-07-20T00:00:00Z"
+    },
+    {
+      "id": 6,
+      "title": "HookGuard — Webhook Signature Gateway",
+      "short_description": "A zero-dependency Go gateway that verifies inbound webhook signatures for four providers behind a single pluggable interface, forwarding only authenticated traffic.",
+      "description": "HookGuard sits in front of an application and refuses any webhook it cannot cryptographically verify. Stripe, Shopify, GitHub and PayPal are each handled behind one pluggable Verifier interface, so adding a provider does not touch the gateway itself.\n\nVerification is constant-time HMAC-SHA256 computed over the raw request body, which is what prevents both signature bypass and timing attacks. PayPal additionally requires RSA-SHA256 against a fetched certificate, so that path carries an SSRF guard on the fetch.\n\nIt is written in Go with no third-party dependencies, covered by table-driven unit tests per provider, and ships via Docker Compose.",
+      "tech_stack": "[\"Go\", \"HMAC-SHA256\", \"RSA-SHA256\", \"Docker\"]",
+      "github_url": "https://github.com/Prateeks16/hookguard",
+      "live_demo_url": "",
+      "image": null,
+      "created_at": "2026-06-20T00:00:00Z"
+    },
+    {
+      "id": 7,
+      "title": "High-Throughput Flash Sale Engine",
+      "short_description": "An event-driven Spring Boot backend sustaining 10,000+ transactions per second under 5ms latency, with Redis atomic locking guaranteeing zero overselling.",
+      "description": "A flash sale is a worst-case concurrency problem: thousands of buyers contend for a small, fixed stock in the same second. This engine handles 10,000+ TPS at under 5ms latency, using Redis atomic locking to keep stock counts perfectly consistent and make overselling impossible.\n\nWrites are decoupled through Apache Kafka so PostgreSQL never absorbs the traffic spike directly, and endpoints are protected with Bucket4j rate limiting.\n\nThe stack is instrumented with Prometheus and Grafana and containerised end to end with Docker Compose.",
+      "tech_stack": "[\"Java\", \"Spring Boot\", \"Redis\", \"Apache Kafka\", \"PostgreSQL\", \"Docker\"]",
+      "github_url": "https://github.com/Prateeks16/high-performance-flashsale",
+      "live_demo_url": "",
+      "image": null,
+      "created_at": "2026-02-15T00:00:00Z"
+    },
     {
       "id": 3,
       "title": "PhishX - Phishing Detection Web App",
@@ -63,7 +96,7 @@
       "position": "Data Science Job Simulation on Forage",
       "location": "Virtual Internship",
       "start_date": "2025-08-26",
-      "end_date": null,
+      "end_date": "2025-08-31",
       "description": "Completed a customer churn analysis simulation for XYZ Analytics, demonstrating advanced data analytics skills, identifying essential client data and outlining a strategic investigation approach.\r\nConducted efficient data analysis using Python, including Pandas and NumPy. Employed data visualization techniques for insightful trend interpretation.\r\nCompleted the engineering and optimization of a random forest model, achieving an 50% recall rate in predicting customer churn.\r\nCompleted a concise executive summary for the team, delivering actionable insights for informed decision-making based on the analysis.",
       "technologies_used": "Data Engineering, Data Pipelines, Data Privacy, SQL, Database Design, ETL",
       "company_logo": "https://res.cloudinary.com/dnkzf5hvi/image/upload/v1/media/company_logos/01-bcgx-logo-color-positive-RGB-small_cvy2ak"
@@ -101,7 +134,7 @@
       "position": "Introduction to Data Science Job Simulation on Forage",
       "location": "Virtual Internship",
       "start_date": "2025-04-22",
-      "end_date": null,
+      "end_date": "2025-04-30",
       "description": "Completed a job simulation involving Data Management skills for Commonwealth Bank's Data Science team.\r\n\r\nDemonstrated proficiency in creating data engineering pipelines to aggregate and extract valuable insights from datasets, optimizing data-driven decision-making.\r\n\r\nAcquired skills in anonymizing personal data within datasets, ensuring compliance with data privacy regulations.\r\n\r\nProposed effective data analysis approaches, particularly related to social media, and demonstrated the ability to design well-structured databases for efficient information management.",
       "technologies_used": "Data Engineering, Data Pipelines, Data Privacy, SQL, Database Design, ETL",
       "company_logo": "https://res.cloudinary.com/dnkzf5hvi/image/upload/v1/media/company_logos/CommBank_Logos_Beacon_Wordmark_Black_el7lzp"
