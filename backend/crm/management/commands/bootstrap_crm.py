@@ -15,6 +15,7 @@ from django.core.management.base import BaseCommand
 
 from api.models import Achievement, Experience, Profile, Project
 from crm.models import EmailTemplate
+from crm.outreach_templates import TEMPLATES as RESUME_MATCHED_TEMPLATES
 
 LIVE_API = 'https://my-portfolio-backend-awei.onrender.com/api'
 
@@ -126,6 +127,10 @@ TEMPLATES = [
         ),
     },
 ]
+
+
+# Templates whose copy is paired with a specific resume variant.
+TEMPLATES += RESUME_MATCHED_TEMPLATES
 
 
 def _fetch(endpoint):

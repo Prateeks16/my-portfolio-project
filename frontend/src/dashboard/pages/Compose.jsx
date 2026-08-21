@@ -423,6 +423,12 @@ const Compose = () => {
                   ['Stage', selectedLead.stage_display],
                   ['Source', selectedLead.source_display],
                   [
+                    'Resume to attach',
+                    selectedLead.resume_for_role === 'ai_ml'
+                      ? 'AI / ML variant'
+                      : 'Backend / SDE variant',
+                  ],
+                  [
                     'Last contacted',
                     selectedLead.last_contacted_at
                       ? relativeTime(selectedLead.last_contacted_at)

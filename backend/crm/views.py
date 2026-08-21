@@ -155,12 +155,16 @@ def _build_context(data):
     if lead_id:
         lead = Lead.objects.filter(pk=lead_id).first()
         if lead:
+            # Scanned postings have no contact person, so name falls back to
+            # the company. Greeting a company by name reads as a mailmerge
+            # failure, so those get a neutral opener instead.
+            is_person = bool(lead.name) and lead.name.strip().lower() != lead.company.strip().lower()
             context.update(
                 {
                     'name': lead.name,
                     'company': lead.company,
                     'role': lead.role,
-                    'first_name': lead.name.split(' ')[0] if lead.name else '',
+                    'first_name': lead.name.split(' ')[0] if is_person else 'there',
                 }
             )
     # Anything passed inline wins over the derived values.

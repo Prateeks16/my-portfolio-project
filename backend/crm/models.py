@@ -2,6 +2,35 @@ from django.db import models
 from django.utils import timezone
 
 
+RESUME_VARIANTS = [
+    ('backend', 'Backend / SDE'),
+    ('ai_ml', 'AI / ML'),
+]
+
+# Signals that a role is machine-learning shaped rather than general backend.
+_AI_SIGNALS = {
+    'ml', 'ai', 'llm', 'rag', 'nlp', 'genai', 'generative', 'vector', 'embedding',
+    'embeddings', 'agent', 'agents', 'agentic', 'data scientist', 'pytorch',
+    'tensorflow', 'huggingface', 'transformers', 'qdrant', 'machine learning',
+    'deep learning', 'computer vision', 'applied scientist',
+}
+
+
+def suggest_resume(role='', tags=''):
+    """Pick which resume fits a role.
+
+    Two real positionings exist: a backend/SDE one led by Java, Spring Boot and
+    Go, and an AI/ML one led by RAG and vector search. Sending the wrong one
+    buries the evidence the reader is actually looking for. Backend is the
+    default because it is the broader document and the safer miss.
+    """
+    haystack = ('%s %s' % (role or '', tags or '')).lower()
+    for signal in _AI_SIGNALS:
+        if signal in haystack:
+            return 'ai_ml'
+    return 'backend'
+
+
 class Lead(models.Model):
     """A person or company in the outreach pipeline (recruiter, client, collaborator)."""
 
@@ -45,6 +74,10 @@ class Lead(models.Model):
 
     # Where the posting came from, for rows created by the scheduled job scan.
     apply_url = models.URLField(blank=True)
+    # Blank means "decide from the role"; set it explicitly to override.
+    resume_variant = models.CharField(
+        max_length=20, choices=RESUME_VARIANTS, blank=True
+    )
     posted_at = models.DateField(blank=True, null=True)
     external_id = models.CharField(max_length=200, blank=True, db_index=True)
 
@@ -63,6 +96,11 @@ class Lead(models.Model):
 
     def __str__(self):
         return '%s <%s>' % (self.name, self.email)
+
+    @property
+    def resume_for_role(self):
+        """The variant to attach: an explicit choice, else inferred from the role."""
+        return self.resume_variant or suggest_resume(self.role, self.tags)
 
     @property
     def tag_list(self):

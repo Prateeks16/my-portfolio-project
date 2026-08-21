@@ -22,6 +22,7 @@ class ActivitySerializer(serializers.ModelSerializer):
 
 class LeadSerializer(serializers.ModelSerializer):
     tag_list = serializers.ReadOnlyField()
+    resume_for_role = serializers.ReadOnlyField()
     is_follow_up_due = serializers.ReadOnlyField()
     stage_display = serializers.CharField(source='get_stage_display', read_only=True)
     source_display = serializers.CharField(source='get_source_display', read_only=True)
