@@ -93,4 +93,13 @@ const main = async () => {
   }
 };
 
-main();
+// This runs as `prebuild`, so a throw here would fail the whole deploy. Baking
+// fresh content is an optimisation, never a release gate: swallow everything and
+// exit clean, leaving the committed snapshot in place.
+main()
+  .catch((error) => {
+    keepExisting(`snapshot step errored (${error?.message || error})`);
+  })
+  .finally(() => {
+    process.exitCode = 0;
+  });
