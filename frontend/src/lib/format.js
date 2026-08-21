@@ -167,4 +167,32 @@ export const parseTechStack = (stack) => {
     .filter(Boolean);
 };
 
+/* Follow-up thresholds, carried over from the pipeline tracker. */
+export const NUDGE_DAYS = 5;
+export const COLD_DAYS = 10;
+
+const SENT_STAGES = ['contacted', 'applied', 'replied', 'interviewing', 'offer', 'won'];
+
+export const hasReplied = (lead) =>
+  Boolean(lead.replied_at) ||
+  ['replied', 'interviewing', 'offer', 'won'].includes(lead.stage);
+
+export const wasSent = (lead) => SENT_STAGES.includes(lead.stage);
+
+export const isOpen = (lead) => lead.stage !== 'lost';
+
+/**
+ * Days since the last outbound contact, for something still waiting on a reply.
+ * Returns null when silence is not the right question — nothing sent yet, a
+ * reply already came, or the lead is closed.
+ */
+export const silenceDays = (lead) => {
+  if (!isOpen(lead) || !wasSent(lead) || hasReplied(lead)) return null;
+  if (!lead.last_contacted_at) return null;
+  const days = Math.floor(
+    (Date.now() - new Date(lead.last_contacted_at).getTime()) / 86400000
+  );
+  return Number.isFinite(days) ? days : null;
+};
+
 export const cx = (...parts) => parts.filter(Boolean).join(' ');

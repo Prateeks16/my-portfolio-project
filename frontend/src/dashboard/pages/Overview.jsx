@@ -13,7 +13,16 @@ import {
 } from 'lucide-react';
 import { useApi } from '../../lib/useApi';
 import { useNow } from '../../lib/useNow';
-import { cx, dueLabel, initials, relativeTime, stageMeta } from '../../lib/format';
+import {
+  COLD_DAYS,
+  NUDGE_DAYS,
+  cx,
+  dueLabel,
+  initials,
+  relativeTime,
+  silenceDays,
+  stageMeta,
+} from '../../lib/format';
 import {
   Badge,
   Button,
@@ -64,18 +73,13 @@ const Overview = () => {
           (a, b) =>
             new Date(a.next_follow_up_at) - new Date(b.next_follow_up_at)
         ),
-      // Contacted a fortnight ago and still silent: the lead most likely to be forgotten.
+      // Sent, no reply, silent past the nudge threshold. Longest wait first,
+      // because that is the one closest to being unrecoverable.
       quiet: open
-        .filter(
-          (lead) =>
-            lead.stage === 'contacted' &&
-            lead.last_contacted_at &&
-            now - new Date(lead.last_contacted_at).getTime() > 14 * 86400000 &&
-            !lead.next_follow_up_at
-        )
-        .sort(
-          (a, b) => new Date(a.last_contacted_at) - new Date(b.last_contacted_at)
-        ),
+        .map((lead) => ({ lead, days: silenceDays(lead) }))
+        .filter((row) => row.days !== null && row.days >= NUDGE_DAYS)
+        .sort((a, b) => b.days - a.days)
+        .map((row) => row.lead),
     };
   }, [leads.data, now]);
 
@@ -108,6 +112,11 @@ const Overview = () => {
                 overdue.length > 0 && {
                   value: overdue.length,
                   label: overdue.length === 1 ? 'follow-up overdue' : 'follow-ups overdue',
+                  tone: 'alert',
+                },
+                quiet.length > 0 && {
+                  value: quiet.length,
+                  label: 'need a nudge',
                   tone: 'alert',
                 },
                 { value: draftList.length, label: 'drafts waiting' },
@@ -214,15 +223,24 @@ const Overview = () => {
                   )}
                 />
                 <QueueGroup
-                  label="Gone quiet"
-                  items={quiet.slice(0, 5)}
-                  render={(lead) => (
-                    <LeadRow
-                      key={lead.id}
-                      lead={lead}
-                      note={`last contacted ${relativeTime(lead.last_contacted_at)}`}
-                    />
-                  )}
+                  label="Needs a nudge"
+                  tone={quiet.some((l) => silenceDays(l) >= COLD_DAYS) ? 'danger' : undefined}
+                  items={quiet.slice(0, 6)}
+                  render={(lead) => {
+                    const days = silenceDays(lead);
+                    return (
+                      <LeadRow
+                        key={lead.id}
+                        lead={lead}
+                        note={
+                          days >= COLD_DAYS
+                            ? `going cold · ${days}d silent`
+                            : `${days}d silent`
+                        }
+                        tone={days >= COLD_DAYS ? 'danger' : undefined}
+                      />
+                    );
+                  }}
                 />
               </div>
             )}

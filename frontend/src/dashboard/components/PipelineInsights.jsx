@@ -1,6 +1,15 @@
 import React, { useMemo } from 'react';
-import { cx, STAGES } from '../../lib/format';
-import { EmptyState, Panel, PanelHeader } from './ui';
+import {
+  COLD_DAYS,
+  NUDGE_DAYS,
+  STAGES,
+  cx,
+  hasReplied,
+  isOpen,
+  silenceDays,
+  wasSent,
+} from '../../lib/format';
+import { EmptyState, Panel, PanelHeader, SummaryLine } from './ui';
 
 /* Order the funnel walks. 'won' and 'lost' are outcomes, not steps, so they are
    reported separately rather than as another bar that always looks like a cliff. */
@@ -12,6 +21,7 @@ const SOURCE_LABELS = {
   linkedin: 'LinkedIn',
   referral: 'Referral',
   job_board: 'Job board',
+  application_form: 'Application form',
   github: 'GitHub',
   email: 'Inbound email',
   manual: 'Added by hand',
@@ -59,7 +69,42 @@ const PipelineInsights = ({ leads }) => {
       });
     });
 
+    const sent = leads.filter(wasSent);
+    const replied = sent.filter(hasReplied);
+    const replyLags = leads
+      .filter((l) => l.replied_at && l.last_contacted_at)
+      .map((l) =>
+        Math.max(
+          0,
+          Math.round(
+            (new Date(l.replied_at) - new Date(l.last_contacted_at)) / 86400000
+          )
+        )
+      );
+    const nudges = leads.filter((l) => {
+      const d = silenceDays(l);
+      return d !== null && d >= NUDGE_DAYS;
+    });
+
+    // Outbound volume per day, from when each lead was last contacted.
+    const perDay = new Map();
+    sent.forEach((l) => {
+      if (!l.last_contacted_at) return;
+      const day = new Date(l.last_contacted_at).toISOString().slice(0, 10);
+      perDay.set(day, (perDay.get(day) || 0) + 1);
+    });
+
     return {
+      sentCount: sent.length,
+      repliedCount: replied.length,
+      responseRate: sent.length ? Math.round((replied.length / sent.length) * 100) : 0,
+      avgReplyDays: replyLags.length
+        ? (replyLags.reduce((a, b) => a + b, 0) / replyLags.length).toFixed(1)
+        : null,
+      nudges: nudges.length,
+      cold: nudges.filter((l) => silenceDays(l) >= COLD_DAYS).length,
+      openCount: leads.filter(isOpen).length,
+      timeline: [...perDay.entries()].sort().map(([date, count]) => ({ date, count })),
       funnel: FUNNEL.map((key) => ({
         key,
         label: STAGES.find((s) => s.key === key).label,
@@ -93,6 +138,30 @@ const PipelineInsights = ({ leads }) => {
 
   return (
     <div className="grid gap-5 lg:grid-cols-2">
+      <div className="lg:col-span-2">
+        <SummaryLine
+          items={[
+            { value: stats.openCount, label: 'open' },
+            { value: stats.sentCount, label: 'sent' },
+            { value: `${stats.responseRate}%`, label: 'response rate' },
+            stats.avgReplyDays !== null && {
+              value: stats.avgReplyDays,
+              label: 'avg days to reply',
+            },
+            stats.nudges > 0 && {
+              value: stats.nudges,
+              label: stats.cold > 0 ? `need a nudge (${stats.cold} cold)` : 'need a nudge',
+              tone: 'alert',
+            },
+          ]}
+        />
+        <p className="mt-2 max-w-2xl text-label leading-relaxed text-ink-tertiary">
+          Response rate counts anything that reached Replied or beyond, over
+          everything sent. With a pipeline this size one reply moves it a lot —
+          read the trend, not the decimal.
+        </p>
+      </div>
+
       <Panel className="lg:col-span-2">
         <PanelHeader
           title="Funnel"
@@ -168,6 +237,11 @@ const PipelineInsights = ({ leads }) => {
         </ul>
       </Panel>
 
+      <Panel className="lg:col-span-2">
+        <PanelHeader title="Activity" meta="Outreach and applications sent per day" />
+        <Timeline points={stats.timeline} />
+      </Panel>
+
       <Panel>
         <PanelHeader
           title="Stack demand"
@@ -198,6 +272,54 @@ const PipelineInsights = ({ leads }) => {
           </ul>
         )}
       </Panel>
+    </div>
+  );
+};
+
+/** Outbound volume per day. Bars, not a line: these are discrete events. */
+const Timeline = ({ points }) => {
+  if (!points.length) {
+    return (
+      <p className="px-4 py-8 text-center text-body text-ink-tertiary">
+        No send dates recorded yet.
+      </p>
+    );
+  }
+
+  // Fill the gaps so quiet days read as quiet rather than being skipped.
+  const first = new Date(points[0].date);
+  const last = new Date(points[points.length - 1].date);
+  const days = [];
+  for (let d = new Date(first); d <= last; d.setDate(d.getDate() + 1)) {
+    const key = d.toISOString().slice(0, 10);
+    days.push({ date: key, count: points.find((p) => p.date === key)?.count || 0 });
+  }
+
+  const max = Math.max(...days.map((d) => d.count), 1);
+  const label = (iso) =>
+    new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+
+  return (
+    <div className="px-4 py-4">
+      <div className="flex h-28 items-end gap-1" role="img"
+           aria-label={`Outreach per day from ${label(days[0].date)} to ${label(days[days.length - 1].date)}, peaking at ${max}`}>
+        {days.map((day) => (
+          <div key={day.date} className="group relative flex-1" title={`${label(day.date)}: ${day.count}`}>
+            <div
+              className={cx(
+                'w-full rounded-sm transition-colors',
+                day.count ? 'bg-ink group-hover:bg-ink-secondary' : 'bg-line'
+              )}
+              style={{ height: day.count ? `${(day.count / max) * 100}%` : '2px' }}
+            />
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 flex justify-between text-label text-ink-tertiary">
+        <span>{label(days[0].date)}</span>
+        <span className="tabular">peak {max}/day</span>
+        <span>{label(days[days.length - 1].date)}</span>
+      </div>
     </div>
   );
 };

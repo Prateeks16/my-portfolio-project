@@ -20,6 +20,7 @@ class Lead(models.Model):
         ('linkedin', 'LinkedIn'),
         ('referral', 'Referral'),
         ('job_board', 'Job Board'),
+        ('application_form', 'Application Form'),
         ('github', 'GitHub'),
         ('job_scan', 'Automated Job Scan'),
         ('email', 'Inbound Email'),
@@ -48,6 +49,7 @@ class Lead(models.Model):
     external_id = models.CharField(max_length=200, blank=True, db_index=True)
 
     last_contacted_at = models.DateTimeField(blank=True, null=True)
+    replied_at = models.DateTimeField(blank=True, null=True)
     next_follow_up_at = models.DateTimeField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

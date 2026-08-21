@@ -33,6 +33,7 @@ STAGE_ALIASES = {
     'interviewing': 'interviewing',
     'offer': 'offer',
     'closed': 'lost',
+    'rejected': 'lost',
     'won': 'won',
     'lost': 'lost',
 }
