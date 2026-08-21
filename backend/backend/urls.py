@@ -23,6 +23,7 @@ from backend import settings
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('api.urls')),
+    path('api/crm/', include('crm.urls')),
 ]
 
 #serve media files during development

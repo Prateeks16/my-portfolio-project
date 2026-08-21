@@ -1,0 +1,132 @@
+{
+  "generatedAt": "2026-08-21T11:05:50.801Z",
+  "profile": {
+    "id": 1,
+    "full_name": "Prateek Sahu",
+    "tagline": "ML & Backend Developer",
+    "bio": "Computer Science undergraduate focused on backend development and applied AI. Experienced in building end-to-end systems involving NLP, data processing, and scalable APIs. Strong at problem-solving, rapid learning, and execution in competitive environments, with proven performance in large-scale college competitions.",
+    "email": "prateeksahu529pvt@gmail.com",
+    "phone": "6267066739",
+    "location": "Greater Noida, Uttar Pradesh, India",
+    "github_url": "https://github.com/Prateeks16",
+    "linkedin_url": "https://www.linkedin.com/in/prateeks16",
+    "resume_pdf": "https://res.cloudinary.com/dnkzf5hvi/image/upload/v1/media/resumes/Prateeksahu_resume_2_sq9et1",
+    "profile_picture": "https://res.cloudinary.com/dnkzf5hvi/image/upload/v1/media/profile_pictures/WhatsApp_Image_2026-01-22_at_6.21.13_PM_dpnccr"
+  },
+  "projects": [
+    {
+      "id": 3,
+      "title": "PhishX - Phishing Detection Web App",
+      "short_description": "A multilingual SMS phishing detection system combining BERT and Naive Bayes models with explainable AI features for transparency.",
+      "description": "PhishX is a specialized security tool designed to detect phishing in multilingual SMS (English and Hinglish) using a hybrid approach of BERT, XLM-R language detection, and TF-IDF Naive Bayes models.\r\nThe project features a full Streamlit web interface that provides real-time spam probability scoring and a custom confidence meter. \r\nA key differentiator is its focus on model interpretability; it includes explainability features like TF-IDF feature importance and BERT attention visualization to help users understand the reasoning behind borderline phishing classifications.",
+      "tech_stack": "[   \"Python\",   \"Streamlit\",   \"Huggingface\",   \"BERT\",   \"XLM-R\",   \"TF-IDF\" ]",
+      "github_url": "https://github.com/Prateeks16/PhishX",
+      "live_demo_url": "https://github.com/Prateeks16/PhishX",
+      "image": "image/upload/v1769410533/tqeksio3ewggwrqsqeco.png",
+      "created_at": "2026-01-26T06:52:09.913152Z"
+    },
+    {
+      "id": 2,
+      "title": "Reddit Sentiment Analysis Web App",
+      "short_description": "A real-time sentiment analysis dashboard that classifies Reddit and news data using RoBERTa models with high accuracy.",
+      "description": "This web application performs real-time sentiment analysis by integrating with Reddit and News APIs to fetch live data based on user-defined subreddits and queries. \r\nIt employs a RoBERTa-based model to classify posts with 68% accuracy, validated against standard classification metrics.\r\nThe application features a responsive UI that visualizes sentiment trends through WordClouds, bar charts, and pie charts, while also offering CSV export functionality for further data analysis.",
+      "tech_stack": "[   \"Python\",   \"Streamlit\",   \"Transformers\",   \"Reddit API\",   \"News API\" ]",
+      "github_url": "https://github.com/Prateeks16/reddit-sentiment-analyzer",
+      "live_demo_url": "https://reddit-sentiment-analyzer-up5sdrnhsntf6olf2eknbt.streamlit.app/",
+      "image": "image/upload/v1769410304/dnrygg1sdw5bybdnwoic.png",
+      "created_at": "2026-01-26T06:51:44.403430Z"
+    },
+    {
+      "id": 1,
+      "title": "KisanGPT",
+      "short_description": "A real-time AI agricultural advisory system utilizing RAG pipelines and Gemini LLM to provide multilingual farming support.",
+      "description": "This project is an advanced agricultural advisory tool designed to assist farmers by answering queries in both Hindi and English. \r\nIt utilizes a Retrieval-Augmented Generation (RAG) pipeline powered by Qdrant vector search to retrieve relevant context from domain-specific PDFs and a dataset of over 3.5 lakh KCC queries. \r\nThe system integrates dynamic context fusion with the Gemini LLM to deliver accurate, context-aware recommendations for crops, fertilizers, and disease treatments.\r\nIt features an interactive Streamlit user interface that exposes retrieved sources and provides concise, actionable insights optimized for non-technical users.",
+      "tech_stack": "[\"Python\", \"Qdrant\", \"Gemini LLM\", \"Transformers\", \"Streamlit\"]",
+      "github_url": "https://huggingface.co/spaces/ps1622/Kisangpt",
+      "live_demo_url": "https://kisangpt-dbecfwkurepnqvnaamylve.streamlit.app/",
+      "image": "image/upload/v1769410072/qgkdr3otptlkozro6qlh.png",
+      "created_at": "2026-01-26T06:47:52.531095Z"
+    }
+  ],
+  "experiences": [
+    {
+      "id": 3,
+      "tech_stack": [
+        "Data Engineering",
+        "Data Pipelines",
+        "Data Privacy",
+        "SQL",
+        "Database Design",
+        "ETL"
+      ],
+      "company_name": "BCG (Boston Consulting Group)",
+      "position": "Data Science Job Simulation on Forage",
+      "location": "Virtual Internship",
+      "start_date": "2025-08-26",
+      "end_date": null,
+      "description": "Completed a customer churn analysis simulation for XYZ Analytics, demonstrating advanced data analytics skills, identifying essential client data and outlining a strategic investigation approach.\r\nConducted efficient data analysis using Python, including Pandas and NumPy. Employed data visualization techniques for insightful trend interpretation.\r\nCompleted the engineering and optimization of a random forest model, achieving an 50% recall rate in predicting customer churn.\r\nCompleted a concise executive summary for the team, delivering actionable insights for informed decision-making based on the analysis.",
+      "technologies_used": "Data Engineering, Data Pipelines, Data Privacy, SQL, Database Design, ETL",
+      "company_logo": "https://res.cloudinary.com/dnkzf5hvi/image/upload/v1/media/company_logos/01-bcgx-logo-color-positive-RGB-small_cvy2ak"
+    },
+    {
+      "id": 1,
+      "tech_stack": [
+        "[\"SDXL\"",
+        "\"Hunyuan3D\"",
+        "\"FastAPI\"",
+        "\"AWS\"",
+        "\"Generative AI\"",
+        "\"Game Engine\"]"
+      ],
+      "company_name": "Red Panda Games",
+      "position": "ML & LLM Data Scientist Intern",
+      "location": "Remote",
+      "start_date": "2025-06-04",
+      "end_date": "2025-08-19",
+      "description": "∗ Built automated biome-generation pipelines that convert text prompts into structured 3D world specifications for\r\ngame engine ingestion.\r\n∗ Implemented a text → image → 3D model workflow using SDXL, Hunyuan3D, FastAPI, and AWS; reduced\r\nmanual asset creation time.\r\n∗ Designed prompt-conditioning and control parameters to stabilize biome outputs, improving consistency of\r\ngenerated assets across diverse environment types.\r\n∗ Integrated terrain, vegetation, creatures, and prop generation into a unified asset pipeline producing\r\nproduction-ready 3D environments.",
+      "technologies_used": "[\"SDXL\", \"Hunyuan3D\", \"FastAPI\", \"AWS\", \"Generative AI\", \"Game Engine\"]",
+      "company_logo": "https://res.cloudinary.com/dnkzf5hvi/image/upload/v1/media/company_logos/red_panda_games_studio_logo_wnvgdy"
+    },
+    {
+      "id": 2,
+      "tech_stack": [
+        "Data Engineering",
+        "Data Pipelines",
+        "Data Privacy",
+        "SQL",
+        "Database Design",
+        "ETL"
+      ],
+      "company_name": "Commonwealth Bank",
+      "position": "Introduction to Data Science Job Simulation on Forage",
+      "location": "Virtual Internship",
+      "start_date": "2025-04-22",
+      "end_date": null,
+      "description": "Completed a job simulation involving Data Management skills for Commonwealth Bank's Data Science team.\r\n\r\nDemonstrated proficiency in creating data engineering pipelines to aggregate and extract valuable insights from datasets, optimizing data-driven decision-making.\r\n\r\nAcquired skills in anonymizing personal data within datasets, ensuring compliance with data privacy regulations.\r\n\r\nProposed effective data analysis approaches, particularly related to social media, and demonstrated the ability to design well-structured databases for efficient information management.",
+      "technologies_used": "Data Engineering, Data Pipelines, Data Privacy, SQL, Database Design, ETL",
+      "company_logo": "https://res.cloudinary.com/dnkzf5hvi/image/upload/v1/media/company_logos/CommBank_Logos_Beacon_Wordmark_Black_el7lzp"
+    }
+  ],
+  "achievements": [
+    {
+      "id": 2,
+      "title": "Smart India Hackathon 2025",
+      "description": "∗ Achieved 3rd position (Top 1.5%) at the institute-level Smart India Hackathon out of 200+ teams.\r\n∗ Conceived and pitched KisanGPT, an AI-based farmer assistance platform.\r\n∗ Recognized among the top-performing teams for innovation and execution quality.",
+      "organization": "SIH 2025",
+      "date": "2026-01-28",
+      "achievement_type": "Hackathon",
+      "badge_image": "https://res.cloudinary.com/dnkzf5hvi/image/upload/v1/media/achievements/ODF_1_lhnvtc",
+      "certificate_url": ""
+    },
+    {
+      "id": 1,
+      "title": "Galgotia International Hackathon Finalist",
+      "description": "∗ Finalist at Galgotias International Hackathon 2024.\r\n∗ Proposed PayRight AI, an app to help users manage and optimize all subscriptions in one place.\r\n∗ Reached the final round among top national teams for innovation in fintech solutions",
+      "organization": "GIH 2025",
+      "date": "2025-09-22",
+      "achievement_type": "Hackathon",
+      "badge_image": "https://res.cloudinary.com/dnkzf5hvi/image/upload/v1/media/achievements/ODF_mfx5pz",
+      "certificate_url": ""
+    }
+  ]
+}

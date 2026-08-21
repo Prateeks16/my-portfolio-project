@@ -1,56 +1,236 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=Manrope:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Manrope:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-body {
-  background-color: #ECEBE9;
-  color: #1A1A1A;
-  font-family: 'Manrope', sans-serif;
-  overflow-x: hidden; /* Horizontal scroll rokne ke liye */
+@layer base {
+  :root {
+    /* Ground */
+    --paper: #ECEBE9;
+    --paper-app: #F4F2EF;
+    --surface: #FFFFFF;
+    --surface-sunk: #FAF9F7;
+    --ink-panel: #1C1A17;
+
+    /* Ink */
+    --ink: #171512;
+    --ink-secondary: #57514A;
+    --ink-tertiary: #6B6259;
+    --line: #E3DED6;
+    --line-strong: #CFC7BC;
+
+    /* Semantic */
+    --success: #3F6B4A;
+    --warning: #8A5A11;
+    --danger: #8C3A2E;
+    --info: #3A5A78;
+
+    --shadow-row: 0 1px 2px rgba(23, 21, 18, 0.05);
+    --shadow-panel: 0 1px 3px rgba(23, 21, 18, 0.06), 0 8px 24px -12px rgba(23, 21, 18, 0.1);
+    --shadow-over: 0 12px 32px -8px rgba(23, 21, 18, 0.22);
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--paper);
+    color: var(--ink);
+    font-family: 'Manrope', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+  }
+
+  /* --- Browser surfaces: the parts we did not draw still carry the design --- */
+
+  ::selection {
+    background-color: #DCD3C4;
+    color: var(--ink);
+  }
+
+  * {
+    caret-color: var(--ink);
+  }
+
+  /* Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--line-strong) transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 11px;
+    height: 11px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--line-strong);
+    border-radius: 999px;
+    /* inset the thumb so it reads as a hairline, not a channel */
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--ink-tertiary);
+    background-clip: content-box;
+  }
+
+  /* Focus is never removed. Every interactive element gets the same ink ring. */
+  :focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  a {
+    text-underline-offset: 0.2em;
+    text-decoration-thickness: 1px;
+  }
+
+  /* Figures align down a column and do not jitter as they update. */
+  table,
+  [data-numeric],
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Dark sidebar is its own surface: give it matching browser chrome. */
+  .surface-ink ::selection {
+    background-color: rgba(255, 255, 255, 0.22);
+    color: #fff;
+  }
+
+  .surface-ink ::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.18);
+    background-clip: content-box;
+  }
+
+  .surface-ink :focus-visible {
+    outline-color: #fff;
+  }
 }
 
-/* Custom Class for Big Headings */
-.heading-serif {
-  font-family: 'Playfair Display', serif;
+@layer components {
+  .heading-serif {
+    font-family: 'Playfair Display', Georgia, serif;
+    letter-spacing: -0.02em;
+  }
+
+  /* Display type: tracking tightens as size grows, capped per DESIGN.md */
+  .display-xl {
+    font-family: 'Playfair Display', Georgia, serif;
+    letter-spacing: -0.04em;
+    line-height: 0.9;
+    text-wrap: balance;
+  }
+
+  .prose-measure {
+    max-width: 68ch;
+  }
 }
 
-/* Smooth Scrolling */
-html {
-  scroll-behavior: smooth;
-}
 @layer utilities {
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
+
   .no-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
-}
 
-/* Navbar Animations */
-@keyframes slideInRight {
-  0% {
-    opacity: 0;
-    transform: translateX(50px) scale(0.9);
+  /* Skeleton shimmer: a slow sweep, not a pulse */
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      var(--line) 0%,
+      #EFEAE2 40%,
+      var(--line) 80%
+    );
+    background-size: 300% 100%;
+    animation: skeleton-sweep 1.6s ease-in-out infinite;
+    border-radius: 6px;
   }
-  100% {
-    opacity: 1;
-    transform: translateX(0) scale(1);
+
+  @keyframes skeleton-sweep {
+    0% {
+      background-position: 140% 0;
+    }
+    100% {
+      background-position: -40% 0;
+    }
+  }
+
+  .animate-fadeIn {
+    animation: fadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .animate-riseIn {
+    animation: riseIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @keyframes riseIn {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* The one authored moment: a lead settling into a new pipeline stage. */
+  .animate-stageSettle {
+    animation: stageSettle 0.42s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @keyframes stageSettle {
+    0% {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 24px -10px rgba(23, 21, 18, 0.3);
+    }
+    60% {
+      transform: translateY(1px);
+    }
+    100% {
+      transform: none;
+      box-shadow: var(--shadow-row);
+    }
   }
 }
 
-.animate-slideInRight {
-  animation: slideInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
 
-.animate-fadeIn {
-  animation: fadeIn 0.3s ease-out forwards;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
