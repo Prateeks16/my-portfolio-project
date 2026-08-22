@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   ArrowUpRight,
+  AtSign,
   BarChart3,
   CheckSquare,
   FileText,
@@ -56,6 +57,13 @@ const NAV = [
     icon: Inbox,
     chunk: () => import('./pages/Inbox'),
     data: ['/crm/inbox/'],
+  },
+  {
+    to: '/dashboard/mail',
+    label: 'Mail',
+    icon: AtSign,
+    chunk: () => import('./pages/Mail'),
+    data: ['/crm/mail/', '/crm/mail/sync_status/'],
   },
   {
     to: '/dashboard/tasks',

@@ -1,9 +1,11 @@
 """Supporting services for the CRM: outbound mail, analytics rollups, GitHub stats."""
 
 import datetime
+import html as html_module
 import json
 import urllib.error
 import urllib.request
+from email.utils import formataddr, make_msgid
 
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives, get_connection
@@ -23,12 +25,31 @@ def mail_is_configured():
                 getattr(settings, 'EMAIL_HOST_PASSWORD', ''))
 
 
+def _html_body(text):
+    """Wrap the plain-text body in minimal HTML.
+
+    Escaped first: an unescaped angle bracket in the message would otherwise be
+    swallowed as markup by the receiving client.
+    """
+    escaped = html_module.escape(text or '')
+    return (
+        '<div style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,'
+        'Helvetica,Arial,sans-serif;font-size:15px;line-height:1.65;'
+        'color:#1a1a1a">%s</div>' % escaped.replace('\n', '<br/>')
+    )
+
+
 def send_outreach_email(email):
     """Actually transmit an OutreachEmail.
 
     Deliberately explicit: this is only ever called from the `send` action on the
     viewset, one email at a time, and it refuses to run unless real credentials
     are present. Drafting never touches this function.
+
+    The message is stamped with a Message-ID that is saved alongside the row,
+    which is what lets an inbound reply be matched back to it. When the email
+    answers something, In-Reply-To and References go out with it so Gmail files
+    it in the existing conversation instead of starting a new one.
     """
     if not mail_is_configured():
         raise MailNotConfigured(
@@ -36,29 +57,42 @@ def send_outreach_email(email):
             'in the backend environment to enable sending. The draft has been saved.'
         )
 
-    from_email = settings.DEFAULT_FROM_EMAIL or settings.EMAIL_HOST_USER
-    connection = get_connection()
+    address = settings.DEFAULT_FROM_EMAIL or settings.EMAIL_HOST_USER
+    from_name = getattr(settings, 'DEFAULT_FROM_NAME', '')
+    # A display name is the difference between "a person wrote to me" and
+    # "something automated did".
+    from_email = formataddr((from_name, address)) if from_name else address
 
-    # Plain text is the source of truth; the HTML part is a light wrapper so the
-    # message renders with paragraph breaks in most clients.
-    html_body = '<div style="font-family:-apple-system,Segoe UI,sans-serif;font-size:15px;line-height:1.6;color:#1a1a1a">%s</div>' % (
-        email.body.replace('\n', '<br/>')
-    )
+    # Minted here rather than left to the SMTP server, because the value has to
+    # be known locally for reply matching to work at all.
+    if not email.message_id:
+        email.message_id = make_msgid(domain=address.split('@')[-1] or None)
+
+    headers = {'Message-ID': email.message_id}
+    if email.in_reply_to:
+        headers['In-Reply-To'] = email.in_reply_to
+        headers['References'] = email.references or email.in_reply_to
+    reply_to = getattr(settings, 'REPLY_TO_EMAIL', '')
 
     message = EmailMultiAlternatives(
         subject=email.subject,
         body=email.body,
         from_email=from_email,
-        to=[email.to_email],
-        connection=connection,
+        to=[formataddr((email.to_name, email.to_email)) if email.to_name
+            else email.to_email],
+        connection=get_connection(),
+        headers=headers,
+        reply_to=[reply_to] if reply_to else None,
     )
-    message.attach_alternative(html_body, 'text/html')
+    message.attach_alternative(_html_body(email.body), 'text/html')
     message.send(fail_silently=False)
 
     email.status = 'sent'
     email.sent_at = timezone.now()
     email.error_message = ''
-    email.save(update_fields=['status', 'sent_at', 'error_message', 'updated_at'])
+    email.save(update_fields=[
+        'status', 'sent_at', 'error_message', 'message_id', 'updated_at',
+    ])
 
     if email.lead:
         email.lead.last_contacted_at = email.sent_at

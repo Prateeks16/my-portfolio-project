@@ -10,6 +10,9 @@ router.register(r'templates', views.EmailTemplateViewSet, basename='templates')
 router.register(r'emails', views.OutreachEmailViewSet, basename='emails')
 router.register(r'tasks', views.TaskViewSet, basename='tasks')
 router.register(r'inbox', views.ContactSubmissionAdminViewSet, basename='inbox')
+# Real Gmail, mirrored in over IMAP. Kept separate from `inbox`, which is the
+# portfolio contact form -- they are different sources with different rules.
+router.register(r'mail', views.InboundEmailViewSet, basename='mail')
 
 # Authenticated write access to the content that renders on the public site.
 router.register(r'manage/profile', views.ManagedProfileViewSet, basename='manage-profile')

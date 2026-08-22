@@ -15,10 +15,13 @@ from api.serializers import (
     SkillSerializer,
 )
 
+from .mailbox import MailboxNotConfigured, mailbox_is_configured, sync_mailbox
 from .models import (
     Activity,
     EmailTemplate,
+    InboundEmail,
     Lead,
+    MailSyncLog,
     OutreachEmail,
     PageView,
     Task,
@@ -27,8 +30,11 @@ from .models import (
 from .serializers import (
     ActivitySerializer,
     EmailTemplateSerializer,
+    InboundEmailListSerializer,
+    InboundEmailSerializer,
     LeadDetailSerializer,
     LeadSerializer,
+    MailSyncLogSerializer,
     OutreachEmailSerializer,
     TaskSerializer,
     TrackSerializer,
@@ -266,7 +272,201 @@ class OutreachEmailViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def mail_status(self, request):
         """Lets the UI tell the user whether sending is live or draft-only."""
-        return Response({'configured': mail_is_configured()})
+        return Response({
+            'configured': mail_is_configured(),
+            'receiving': mailbox_is_configured(),
+        })
+
+
+class InboundEmailViewSet(viewsets.ReadOnlyModelViewSet):
+    """Real email, mirrored out of Gmail over IMAP.
+
+    Read-only by design: the mailbox is the source of truth and this is a view
+    onto it. The only writes are the two local flags (read, archived), which
+    exist so triaging in the CRM never disturbs what is unread in Gmail.
+    """
+
+    permission_classes = [IsAuthenticated]
+    serializer_class = InboundEmailSerializer
+
+    def get_queryset(self):
+        queryset = InboundEmail.objects.select_related('lead', 'replies_to')
+
+        if self.request.query_params.get('archived') == 'true':
+            queryset = queryset.filter(is_archived=True)
+        else:
+            queryset = queryset.filter(is_archived=False)
+
+        if self.request.query_params.get('unread') == 'true':
+            queryset = queryset.filter(is_read=False)
+        lead_id = self.request.query_params.get('lead')
+        if lead_id:
+            queryset = queryset.filter(lead_id=lead_id)
+
+        search = self.request.query_params.get('search')
+        if search:
+            from django.db.models import Q
+
+            queryset = queryset.filter(
+                Q(subject__icontains=search)
+                | Q(from_email__icontains=search)
+                | Q(from_name__icontains=search)
+                | Q(body_text__icontains=search)
+            )
+        return queryset
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return InboundEmailListSerializer
+        return InboundEmailSerializer
+
+    @action(detail=False, methods=['post'])
+    def sync(self, request):
+        """Pull new mail from Gmail on demand.
+
+        The free-tier backend has no always-on worker, so the dashboard asking
+        for a sync is the primary trigger; the management command covers cron.
+        """
+        try:
+            log = sync_mailbox(days=int(request.data.get('days') or 0) or None)
+        except MailboxNotConfigured as exc:
+            return Response(
+                {'detail': str(exc), 'code': 'mailbox_not_configured'},
+                status=status.HTTP_409_CONFLICT,
+            )
+        if not log.ok:
+            return Response(
+                {'detail': log.error_message, 'code': 'sync_failed',
+                 'log': MailSyncLogSerializer(log).data},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        return Response(MailSyncLogSerializer(log).data)
+
+    @action(detail=False, methods=['get'])
+    def sync_status(self, request):
+        """When mail last came in, and whether receiving is switched on at all."""
+        latest = MailSyncLog.objects.first()
+        return Response({
+            'configured': mailbox_is_configured(),
+            'unread': InboundEmail.objects.filter(
+                is_read=False, is_archived=False
+            ).count(),
+            'total': InboundEmail.objects.count(),
+            'last_sync': MailSyncLogSerializer(latest).data if latest else None,
+        })
+
+    @action(detail=True, methods=['post'])
+    def read(self, request, pk=None):
+        """Toggle the CRM's own read flag. Gmail is left exactly as it was."""
+        message = self.get_object()
+        message.is_read = request.data.get('is_read', True) is not False
+        message.save(update_fields=['is_read'])
+        return Response(InboundEmailSerializer(message).data)
+
+    @action(detail=True, methods=['post'])
+    def archive(self, request, pk=None):
+        """Hide from the CRM inbox. Nothing is archived or deleted in Gmail."""
+        message = self.get_object()
+        message.is_archived = request.data.get('is_archived', True) is not False
+        message.save(update_fields=['is_archived'])
+        return Response(InboundEmailSerializer(message).data)
+
+    @action(detail=True, methods=['post'])
+    def reply(self, request, pk=None):
+        """Draft a threaded reply, and optionally send it in the same call.
+
+        Carrying In-Reply-To and References through is what makes Gmail file the
+        reply into the conversation it belongs to, on both sides, instead of
+        opening a fresh thread the recipient has to mentally re-attach.
+        """
+        message = self.get_object()
+        body = (request.data.get('body') or '').strip()
+        if not body:
+            return Response({'detail': 'A reply needs a body.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        subject = request.data.get('subject') or _reply_subject(message.subject)
+        # The full ancestry, this message appended, is what keeps long threads
+        # intact rather than only the immediate parent.
+        references = ' '.join(
+            [part for part in [message.references, message.message_id] if part]
+        ).strip()
+
+        email = OutreachEmail.objects.create(
+            lead=message.lead,
+            to_email=message.from_email,
+            to_name=message.from_name,
+            subject=subject[:300],
+            body=body,
+            status='draft',
+            in_reply_to=message.message_id,
+            references=references,
+        )
+
+        if request.data.get('send'):
+            try:
+                send_outreach_email(email)
+            except MailNotConfigured as exc:
+                return Response(
+                    {'detail': str(exc), 'code': 'mail_not_configured',
+                     'email': OutreachEmailSerializer(email).data},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            except Exception as exc:  # network, auth, malformed address
+                email.status = 'failed'
+                email.error_message = str(exc)
+                email.save(update_fields=['status', 'error_message', 'updated_at'])
+                return Response(
+                    {'detail': str(exc), 'code': 'send_failed',
+                     'email': OutreachEmailSerializer(email).data},
+                    status=status.HTTP_502_BAD_GATEWAY,
+                )
+            # Replying is the strongest signal there is that it has been read.
+            if not message.is_read:
+                message.is_read = True
+                message.save(update_fields=['is_read'])
+
+        return Response(OutreachEmailSerializer(email).data,
+                        status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'])
+    def convert(self, request, pk=None):
+        """Turn an unknown sender into a tracked lead, without duplicating."""
+        message = self.get_object()
+        lead, created = Lead.objects.get_or_create(
+            email=message.from_email,
+            defaults={
+                'name': message.from_name or message.from_email,
+                'source': 'email',
+                'notes': '%s\n\n%s' % (message.subject, message.snippet),
+                'stage': 'replied',
+            },
+        )
+        if created:
+            Activity.objects.create(
+                lead=lead,
+                kind='created',
+                summary='Converted from inbound email: %s' % message.subject,
+                body=message.body_text,
+            )
+        # Backfill every message from this sender, not only the one clicked.
+        InboundEmail.objects.filter(
+            from_email__iexact=message.from_email, lead__isnull=True
+        ).update(lead=lead)
+        message.refresh_from_db()
+
+        return Response(
+            {'lead': LeadSerializer(lead).data, 'created': created},
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+
+def _reply_subject(subject):
+    """Prefix with Re: unless the subject already carries one."""
+    subject = (subject or '').strip()
+    if subject.lower().startswith('re:'):
+        return subject
+    return 'Re: %s' % subject if subject else 'Re:'
 
 
 class TaskViewSet(viewsets.ModelViewSet):

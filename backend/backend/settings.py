@@ -221,6 +221,27 @@ EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
+# The display name recipients see. Without it Gmail shows the bare address,
+# which reads like a script rather than a person.
+DEFAULT_FROM_NAME = os.environ.get('DEFAULT_FROM_NAME', '')
+# Where replies should go if it differs from the sending mailbox.
+REPLY_TO_EMAIL = os.environ.get('REPLY_TO_EMAIL', '')
+
+
+# --- INBOUND EMAIL (IMAP) ---
+# The other half of the loop: replies land in Gmail, and this is how they get
+# back into the CRM. Same credentials as sending -- Gmail accepts one App
+# Password for both SMTP and IMAP, so enabling sending enables receiving.
+# IMAP must also be switched on in Gmail: Settings -> Forwarding and POP/IMAP.
+IMAP_HOST = os.environ.get('IMAP_HOST', 'imap.gmail.com')
+IMAP_PORT = int(os.environ.get('IMAP_PORT', '993'))
+IMAP_USE_SSL = os.environ.get('IMAP_USE_SSL', 'True') == 'True'
+IMAP_FOLDER = os.environ.get('IMAP_FOLDER', 'INBOX')
+# Sync reaches back this many days on each run. Generous enough to recover from
+# a backend that slept through a delivery, short enough to stay a quick call.
+IMAP_SYNC_DAYS = int(os.environ.get('IMAP_SYNC_DAYS', '14'))
+# Hard ceiling per sync so one run can never hang on a busy mailbox.
+IMAP_MAX_MESSAGES = int(os.environ.get('IMAP_MAX_MESSAGES', '80'))
 
 
 # --- CRM ---

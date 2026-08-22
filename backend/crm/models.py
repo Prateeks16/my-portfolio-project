@@ -117,6 +117,7 @@ class Activity(models.Model):
     KIND_CHOICES = [
         ('note', 'Note'),
         ('email_sent', 'Email Sent'),
+        ('email_received', 'Reply Received'),
         ('email_draft', 'Email Drafted'),
         ('stage_change', 'Stage Change'),
         ('call', 'Call'),
@@ -199,6 +200,15 @@ class OutreachEmail(models.Model):
     sent_at = models.DateTimeField(blank=True, null=True)
     error_message = models.TextField(blank=True)
 
+    # --- threading ---
+    # The Message-ID this email was sent with, minted before transmission and
+    # stored so an inbound reply quoting it can be matched back to this row.
+    message_id = models.CharField(max_length=300, blank=True, db_index=True)
+    # Set when this is a reply: the Message-ID of the message being answered.
+    # Gmail uses these two headers to decide what belongs in the same thread.
+    in_reply_to = models.CharField(max_length=300, blank=True)
+    references = models.TextField(blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -207,6 +217,83 @@ class OutreachEmail(models.Model):
 
     def __str__(self):
         return '[%s] %s -> %s' % (self.status, self.subject, self.to_email)
+
+
+class InboundEmail(models.Model):
+    """A real email pulled out of the Gmail mailbox over IMAP.
+
+    Distinct from ContactSubmission, which is the portfolio form. This is
+    ordinary mail -- recruiter replies, referrals, anything that lands in the
+    inbox -- mirrored into the CRM so a conversation started here can be
+    finished here. Gmail stays the system of record; nothing is deleted there.
+
+    Deduplication is on `message_id`, the globally unique header every mail
+    system stamps, so re-syncing the same window is safe and idempotent.
+    """
+
+    # RFC 5322 Message-ID. Unique so a repeated sync silently no-ops rather
+    # than stacking duplicates of the same message.
+    message_id = models.CharField(max_length=300, unique=True, db_index=True)
+    in_reply_to = models.CharField(max_length=300, blank=True, db_index=True)
+    references = models.TextField(blank=True)
+    # Gmail's own thread grouping is not exposed over IMAP, so threads are
+    # reconstructed locally from In-Reply-To / References.
+    thread_key = models.CharField(max_length=300, blank=True, db_index=True)
+
+    from_email = models.EmailField(db_index=True)
+    from_name = models.CharField(max_length=200, blank=True)
+    to_email = models.CharField(max_length=400, blank=True)
+    cc_email = models.CharField(max_length=400, blank=True)
+    subject = models.CharField(max_length=500, blank=True)
+    body_text = models.TextField(blank=True)
+    body_html = models.TextField(blank=True)
+    snippet = models.CharField(max_length=300, blank=True)
+    has_attachments = models.BooleanField(default=False)
+
+    # Matched during sync where the sender is already known.
+    lead = models.ForeignKey(
+        Lead, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='inbound_emails',
+    )
+    # Set when this message is a reply to something the CRM sent.
+    replies_to = models.ForeignKey(
+        OutreachEmail, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='replies',
+    )
+
+    is_read = models.BooleanField(default=False)
+    is_archived = models.BooleanField(default=False)
+
+    sent_at = models.DateTimeField(blank=True, null=True)
+    synced_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-sent_at', '-synced_at']
+        indexes = [
+            models.Index(fields=['is_archived', '-sent_at']),
+            models.Index(fields=['is_read']),
+        ]
+
+    def __str__(self):
+        return '%s <%s>: %s' % (self.from_name, self.from_email, self.subject)
+
+
+class MailSyncLog(models.Model):
+    """One IMAP run, kept so the dashboard can show when mail last came in."""
+
+    started_at = models.DateTimeField(auto_now_add=True)
+    finished_at = models.DateTimeField(blank=True, null=True)
+    fetched = models.IntegerField(default=0)
+    created = models.IntegerField(default=0)
+    matched_leads = models.IntegerField(default=0)
+    ok = models.BooleanField(default=False)
+    error_message = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['-started_at']
+
+    def __str__(self):
+        return '%s: %s new' % (self.started_at, self.created)
 
 
 class PageView(models.Model):

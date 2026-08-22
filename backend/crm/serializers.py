@@ -3,11 +3,11 @@ from rest_framework import serializers
 from .models import (
     Activity,
     EmailTemplate,
+    InboundEmail,
     Lead,
+    MailSyncLog,
     OutreachEmail,
-    PageView,
     Task,
-    TrackedEvent,
 )
 
 
@@ -57,6 +57,43 @@ class OutreachEmailSerializer(serializers.ModelSerializer):
         read_only_fields = ['created_at', 'updated_at', 'sent_at', 'error_message']
 
 
+class InboundEmailListSerializer(serializers.ModelSerializer):
+    """The list view: enough to render a row, without shipping every body."""
+
+    lead_name = serializers.CharField(source='lead.name', read_only=True)
+
+    class Meta:
+        model = InboundEmail
+        fields = [
+            'id', 'from_email', 'from_name', 'subject', 'snippet',
+            'sent_at', 'is_read', 'is_archived', 'has_attachments',
+            'lead', 'lead_name', 'replies_to', 'thread_key',
+        ]
+
+
+class InboundEmailSerializer(serializers.ModelSerializer):
+    lead_name = serializers.CharField(source='lead.name', read_only=True)
+    replies_to_subject = serializers.CharField(
+        source='replies_to.subject', read_only=True
+    )
+
+    class Meta:
+        model = InboundEmail
+        fields = '__all__'
+        # Everything of substance is written by the IMAP sync, never by a
+        # client. Only the two local flags are editable from the dashboard.
+        read_only_fields = [
+            f.name for f in InboundEmail._meta.fields
+            if f.name not in ('is_read', 'is_archived')
+        ]
+
+
+class MailSyncLogSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MailSyncLog
+        fields = '__all__'
+
+
 class TaskSerializer(serializers.ModelSerializer):
     lead_name = serializers.CharField(source='lead.name', read_only=True)
 
@@ -64,18 +101,6 @@ class TaskSerializer(serializers.ModelSerializer):
         model = Task
         fields = '__all__'
         read_only_fields = ['created_at']
-
-
-class PageViewSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = PageView
-        fields = '__all__'
-
-
-class TrackedEventSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = TrackedEvent
-        fields = '__all__'
 
 
 class TrackSerializer(serializers.Serializer):
