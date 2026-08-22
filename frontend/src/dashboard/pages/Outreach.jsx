@@ -43,7 +43,7 @@ const Outreach = () => {
         action={
           <Link
             to="/dashboard/outreach/compose"
-            className="inline-flex h-9 items-center gap-2 rounded-control bg-ink px-3.5 text-body font-medium text-white transition-colors duration-150 hover:bg-ink-secondary"
+            className="inline-flex h-9 items-center gap-2 rounded-full bg-ink px-4 text-body font-semibold text-on-accent transition-all duration-500 ease-fluid hover:bg-white active:scale-[0.98]"
           >
             <Plus size={15} /> Compose
           </Link>
@@ -72,7 +72,7 @@ const Outreach = () => {
             className={cx(
               'h-8 rounded-control px-3 text-label font-medium transition-colors duration-150',
               filter === value
-                ? 'bg-ink text-white'
+                ? 'bg-ink text-on-accent'
                 : 'border border-line-strong bg-surface text-ink-secondary hover:bg-surface-sunk'
             )}
           >
@@ -102,7 +102,7 @@ const Outreach = () => {
             action={
               <Link
                 to="/dashboard/outreach/compose"
-                className="inline-flex h-9 items-center gap-2 rounded-control bg-ink px-3.5 text-body font-medium text-white transition-colors duration-150 hover:bg-ink-secondary"
+                className="inline-flex h-9 items-center gap-2 rounded-full bg-ink px-4 text-body font-semibold text-on-accent transition-all duration-500 ease-fluid hover:bg-white active:scale-[0.98]"
               >
                 <Plus size={15} /> Compose
               </Link>

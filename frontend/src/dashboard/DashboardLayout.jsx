@@ -10,11 +10,9 @@ import {
   LayoutGrid,
   LogOut,
   Mail,
-  Menu,
   Send,
   Settings,
   Users,
-  X,
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { prefetch } from '../lib/useApi';
@@ -118,78 +116,79 @@ const DashboardLayout = () => {
     navigate('/dashboard/login', { replace: true });
   };
 
+  // The rail is a detached glass slab, not a wall welded to the viewport edge.
   const sidebar = (
-    <div className="surface-ink flex h-full flex-col bg-ink-panel">
-      <div className="border-b border-white/[0.08] px-5 py-[1.15rem]">
-        {/* The one place Playfair appears in the CRM: the wordmark. */}
-        <p className="heading-serif text-[1.0625rem] font-semibold text-white">
+    <div className="flex h-full flex-col overflow-hidden rounded-shell border border-white/[0.07] bg-white/[0.03] backdrop-blur-2xl">
+      <div className="border-b border-white/[0.06] px-5 py-[1.15rem]">
+        <p className="display-face text-[1.0625rem] font-semibold text-ink">
           Prateek Sahu
         </p>
-        <p className="mt-0.5 text-micro font-semibold uppercase text-white/55">
+        <p className="mt-1 text-[0.625rem] font-medium uppercase tracking-[0.2em] text-ink-tertiary">
           Portfolio CRM
         </p>
       </div>
 
-      <nav aria-label="Dashboard" className="flex-1 space-y-0.5 overflow-y-auto px-2.5 py-3.5">
+      <nav aria-label="Dashboard" className="flex-1 space-y-1 overflow-y-auto px-2.5 py-4">
         {NAV.map((entry) => {
           const { to, label, icon: Icon, end } = entry;
           return (
-          <NavLink
-            key={to}
-            to={to}
-            end={end}
-            onMouseEnter={() => warm(entry)}
-            onFocus={() => warm(entry)}
-            onClick={() => setDrawerOpen(false)}
-            className={({ isActive }) =>
-              cx(
-                'flex items-center gap-3 rounded-control px-3 py-2 text-body font-medium',
-                'transition-colors duration-150 ease-out',
-                isActive
-                  ? 'bg-white text-ink'
-                  : 'text-white/55 hover:bg-white/[0.07] hover:text-white'
-              )
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <Icon size={16} strokeWidth={isActive ? 2.25 : 1.9} />
-                {label}
-              </>
-            )}
-          </NavLink>
+            <NavLink
+              key={to}
+              to={to}
+              end={end}
+              onMouseEnter={() => warm(entry)}
+              onFocus={() => warm(entry)}
+              onClick={() => setDrawerOpen(false)}
+              className={({ isActive }) =>
+                cx(
+                  'flex items-center gap-3 rounded-full px-3.5 py-2 text-body font-medium',
+                  'transition-all duration-500 ease-fluid',
+                  isActive
+                    ? 'bg-ink text-on-accent shadow-[0_12px_30px_-16px_rgba(255,255,255,0.6)]'
+                    : 'text-ink-secondary hover:bg-white/[0.07] hover:text-ink'
+                )
+              }
+            >
+              <Icon size={16} />
+              {label}
+            </NavLink>
           );
         })}
       </nav>
 
-      <div className="border-t border-white/[0.08] p-2.5">
+      <div className="border-t border-white/[0.06] p-2.5">
         <a
           href="/"
           target="_blank"
           rel="noreferrer"
           onClick={() => setDrawerOpen(false)}
-          className="mb-1 flex items-center gap-3 rounded-control px-3 py-2 text-body font-medium text-white/55 transition-colors duration-150 hover:bg-white/[0.07] hover:text-white"
+          className="group mb-1 flex items-center justify-between gap-3 rounded-full px-3.5 py-2 text-body font-medium text-ink-secondary transition-all duration-500 ease-fluid hover:bg-white/[0.07] hover:text-ink"
         >
-          <ArrowUpRight size={16} strokeWidth={1.9} />
           View live site
-        </a>
-        <div className="flex items-center gap-2.5 rounded-control px-3 py-2">
           <span
             aria-hidden="true"
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/10 text-micro font-bold text-white"
+            className="flex h-6 w-6 items-center justify-center rounded-full bg-white/[0.07] transition-all duration-700 ease-fluid group-hover:translate-x-0.5 group-hover:-translate-y-[1px] group-hover:scale-105 group-hover:bg-white/[0.14]"
+          >
+            <ArrowUpRight size={13} />
+          </span>
+        </a>
+        <div className="flex items-center gap-2.5 rounded-full px-3.5 py-2">
+          <span
+            aria-hidden="true"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.07] text-micro font-bold text-ink"
           >
             {initials(username || 'Prateek Sahu')}
           </span>
-          <span className="min-w-0 flex-1 truncate text-body text-white/70">
+          <span className="min-w-0 flex-1 truncate text-body text-ink-secondary">
             {username || 'admin'}
           </span>
           <button
             onClick={handleLogout}
             aria-label="Sign out"
             title="Sign out"
-            className="rounded-control p-1.5 text-white/45 transition-colors duration-150 hover:bg-white/10 hover:text-white"
+            className="flex h-7 w-7 items-center justify-center rounded-full text-ink-tertiary transition-all duration-500 ease-fluid hover:bg-white/[0.1] hover:text-ink"
           >
-            <LogOut size={15} />
+            <LogOut size={14} />
           </button>
         </div>
       </div>
@@ -197,37 +196,59 @@ const DashboardLayout = () => {
   );
 
   return (
-    <div className="min-h-screen bg-paper-app">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[15rem] lg:block">
+    <div className="min-h-[100dvh] bg-paper-app">
+      <aside className="fixed inset-y-3 left-3 z-30 hidden w-[15rem] lg:block">
         {sidebar}
       </aside>
 
-      {drawerOpen && (
-        <div className="lg:hidden">
-          <div
-            className="fixed inset-0 z-40 bg-ink/45"
-            onClick={() => setDrawerOpen(false)}
-            aria-hidden="true"
-          />
-          <aside className="fixed inset-y-0 left-0 z-50 w-[15rem] animate-fadeIn shadow-over">
-            {sidebar}
-          </aside>
-        </div>
-      )}
+      {/* Kept mounted so the drawer interpolates out as well as in. */}
+      <div className="lg:hidden" aria-hidden={!drawerOpen}>
+        <div
+          className={cx(
+            'fixed inset-0 z-40 bg-black/70 backdrop-blur-2xl transition-opacity duration-700 ease-fluid',
+            drawerOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
+          )}
+          onClick={() => setDrawerOpen(false)}
+        />
+        <aside
+          className={cx(
+            'fixed inset-y-3 left-3 z-50 w-[15rem] transition-transform duration-700 ease-fluid',
+            drawerOpen ? 'translate-x-0' : 'pointer-events-none -translate-x-[110%]'
+          )}
+        >
+          {sidebar}
+        </aside>
+      </div>
 
-      <div className="lg:pl-[15rem]">
-        <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-line bg-paper-app/90 px-4 py-2.5 backdrop-blur lg:hidden">
-          <button
-            onClick={() => setDrawerOpen((open) => !open)}
-            aria-label="Toggle navigation"
-            aria-expanded={drawerOpen}
-            className="rounded-control border border-line-strong bg-surface p-2 text-ink transition-colors duration-150 hover:bg-surface-sunk"
-          >
-            {drawerOpen ? <X size={16} /> : <Menu size={16} />}
-          </button>
-          <span className="heading-serif text-body font-semibold text-ink">
-            Portfolio CRM
-          </span>
+      <div className="lg:pl-[16rem]">
+        <header className="sticky top-0 z-20 px-3 pt-3 lg:hidden">
+          <div className="flex items-center gap-3 rounded-full border border-white/[0.07] bg-white/[0.05] py-2 pl-2 pr-5 backdrop-blur-2xl">
+            <button
+              onClick={() => setDrawerOpen((open) => !open)}
+              aria-label="Toggle navigation"
+              aria-expanded={drawerOpen}
+              className="relative h-9 w-9 shrink-0 rounded-full border border-white/10 bg-white/[0.06] transition-colors duration-500 ease-fluid hover:bg-white/[0.12]"
+            >
+              {/* Two lines folding into an X, never an icon swap. */}
+              <span
+                aria-hidden="true"
+                className={cx(
+                  'absolute left-1/2 h-px w-4 -translate-x-1/2 bg-ink transition-all duration-500 ease-fluid',
+                  drawerOpen ? 'top-1/2 rotate-45' : 'top-[15px]'
+                )}
+              />
+              <span
+                aria-hidden="true"
+                className={cx(
+                  'absolute left-1/2 h-px w-4 -translate-x-1/2 bg-ink transition-all duration-500 ease-fluid',
+                  drawerOpen ? 'top-1/2 -rotate-45' : 'top-[21px]'
+                )}
+              />
+            </button>
+            <span className="display-face text-body font-semibold text-ink">
+              Portfolio CRM
+            </span>
+          </div>
         </header>
 
         <main className="px-4 py-6 sm:px-6 lg:px-8 lg:py-8">

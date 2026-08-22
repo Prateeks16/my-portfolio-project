@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { Button, ErrorNote, Field, Input } from './components/ui';
@@ -37,22 +37,21 @@ const Login = () => {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-paper">
-      <div className="flex flex-1 items-center justify-center px-5 py-12">
+    <div className="flex min-h-[100dvh] flex-col bg-paper">
+      <div className="flex flex-1 items-center justify-center px-5 py-24">
         <div className="w-full max-w-sm">
-          <div className="mb-8">
-            <h1 className="heading-serif text-[2rem] font-semibold leading-tight text-ink">
+          <div className="mb-10">
+            <span className="eyebrow">Restricted</span>
+            <h1 className="display-face mt-5 text-[2.5rem] font-medium leading-[0.95] text-ink">
               Portfolio CRM
             </h1>
-            <p className="mt-1.5 text-body leading-relaxed text-ink-secondary">
+            <p className="mt-4 text-body leading-relaxed text-ink-secondary">
               Sign in to manage leads, outreach and everything on the public site.
             </p>
           </div>
 
-          <form
-            onSubmit={submit}
-            className="space-y-4 rounded-panel border border-line bg-surface p-6 shadow-panel"
-          >
+          <form onSubmit={submit} className="bezel space-y-5 shadow-panel">
+            <div className="bezel-core space-y-5 p-6">
             {error && <ErrorNote>{error}</ErrorNote>}
 
             <Field label="Username" htmlFor="username">
@@ -87,7 +86,8 @@ const Login = () => {
               type="submit"
               size="lg"
               loading={busy}
-              className="w-full"
+              icon={busy ? undefined : ArrowRight}
+              className="w-full justify-between"
               disabled={!form.username || !form.password}
             >
               {busy ? 'Signing in' : 'Sign in'}
@@ -97,11 +97,12 @@ const Login = () => {
               The account is the Django superuser on the backend. If the server has
               been idle it can take up to a minute to answer the first request.
             </p>
+            </div>
           </form>
 
           <Link
             to="/"
-            className="mt-6 inline-flex items-center gap-2 text-label font-medium text-ink-secondary underline-offset-4 hover:text-ink hover:underline"
+            className="group mt-8 inline-flex items-center gap-2.5 rounded-full px-3 py-2 text-label font-medium text-ink-secondary transition-all duration-500 ease-fluid hover:bg-white/[0.06] hover:text-ink"
           >
             <ArrowLeft size={14} />
             Back to the portfolio

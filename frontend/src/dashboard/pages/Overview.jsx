@@ -183,7 +183,7 @@ const Overview = () => {
                 action={
                   <Link
                     to="/dashboard/leads?new=1"
-                    className="inline-flex h-9 items-center gap-2 rounded-control bg-ink px-3.5 text-body font-medium text-white transition-colors duration-150 hover:bg-ink-secondary"
+                    className="inline-flex h-9 items-center gap-2 rounded-full bg-ink px-4 text-body font-semibold text-on-accent transition-all duration-500 ease-fluid hover:bg-white active:scale-[0.98]"
                   >
                     <Plus size={14} /> Add a lead
                   </Link>
@@ -502,9 +502,9 @@ const PipelineBar = ({ stages }) => {
               title={`${stage.label}: ${stage.count}`}
               style={{
                 width: `${(stage.count / total) * 100}%`,
-                // A single ink ramp: later stages read darker, so progress is legible
-                // without assigning a decorative colour to every stage.
-                backgroundColor: `color-mix(in srgb, #171512 ${25 + index * 15}%, #CFC7BC)`,
+                // A single ink ramp: later stages read brighter, so progress is
+                // legible without assigning a decorative colour to every stage.
+                backgroundColor: `color-mix(in srgb, #F4F4F7 ${25 + index * 15}%, #2F2F38)`,
               }}
             />
           ) : null
@@ -559,11 +559,11 @@ const Sparkline = ({ series }) => {
         role="img"
         aria-label={`Page views over the last 30 days, peaking at ${max} in a day`}
       >
-        <polygon points={area} fill="#171512" opacity="0.07" />
+        <polygon points={area} fill="#F4F4F7" opacity="0.1" />
         <polyline
           points={line}
           fill="none"
-          stroke="#171512"
+          stroke="#F4F4F7"
           strokeWidth="1.5"
           strokeLinejoin="round"
           strokeLinecap="round"

@@ -195,7 +195,7 @@ const LeadDetail = () => {
         <div className="flex items-center gap-2">
           <Link
             to={`/dashboard/outreach/compose?lead=${lead.id}`}
-            className="inline-flex h-9 items-center gap-2 rounded-control bg-ink px-3.5 text-body font-medium text-white transition-colors duration-150 hover:bg-ink-secondary"
+            className="inline-flex h-9 items-center gap-2 rounded-full bg-ink px-4 text-body font-semibold text-on-accent transition-all duration-500 ease-fluid hover:bg-white active:scale-[0.98]"
           >
             <Send size={14} /> Draft email
           </Link>

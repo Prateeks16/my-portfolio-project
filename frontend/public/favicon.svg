@@ -1,5 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="14" fill="#171512"/>
-  <text x="32" y="44" font-family="Georgia, serif" font-size="34" font-weight="600"
-        fill="#ECEBE9" text-anchor="middle">P</text>
+  <rect width="64" height="64" rx="16" fill="#050505"/>
+  <rect x="1" y="1" width="62" height="62" rx="15" fill="none" stroke="#ffffff" stroke-opacity="0.14"/>
+  <text x="32" y="44" font-family="'Space Grotesk', 'Segoe UI', system-ui, sans-serif"
+        font-size="34" font-weight="600" letter-spacing="-1"
+        fill="#F4F4F7" text-anchor="middle">P</text>
 </svg>

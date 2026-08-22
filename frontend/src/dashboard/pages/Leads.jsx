@@ -142,7 +142,7 @@ const Leads = () => {
               className={cx(
                 'inline-flex h-9 items-center gap-1.5 px-3 text-label font-medium transition-colors duration-150',
                 view === key
-                  ? 'bg-ink text-white'
+                  ? 'bg-ink text-on-accent'
                   : 'bg-surface text-ink-secondary hover:bg-surface-sunk'
               )}
             >

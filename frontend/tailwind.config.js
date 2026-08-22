@@ -4,38 +4,52 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Ground
-        paper: '#ECEBE9',
-        'paper-app': '#F4F2EF',
-        surface: '#FFFFFF',
-        'surface-sunk': '#FAF9F7',
-        'ink-panel': '#1C1A17',
+        // Ground — deepest OLED black; the CRM sits one step off pure void.
+        paper: '#050505',
+        'paper-app': '#08080A',
+        surface: '#0C0C0F',
+        'surface-sunk': '#101014',
+        'ink-panel': '#08080B',
 
-        // Ink — every neutral is warm-shifted; no cool grays in this world.
+        // Ink — inverted for an OLED ground. `ink` is the brightest foreground.
         ink: {
-          DEFAULT: '#171512',
-          secondary: '#57514A',
-          tertiary: '#6B6259',
+          DEFAULT: '#F4F4F7',
+          secondary: '#A4A4B0',
+          tertiary: '#7C7C8A',
         },
+
+        // Hairlines are kept as solid hex rather than white/alpha so that the
+        // opacity modifiers already used across the app (`border-line/40`)
+        // still compile. Both values match white at 8% and 16% over the glass.
         line: {
-          DEFAULT: '#E3DED6',
-          strong: '#CFC7BC',
+          DEFAULT: '#1E1E23',
+          strong: '#2F2F38',
         },
 
-        // Semantic — muted for a paper world, all >=4.5:1 on white
-        success: { DEFAULT: '#3F6B4A', bg: '#EDF3EE' },
-        warning: { DEFAULT: '#8A5A11', bg: '#FBF3E4' },
-        danger: { DEFAULT: '#8C3A2E', bg: '#FAEDEA' },
-        info: { DEFAULT: '#3A5A78', bg: '#EDF2F7' },
+        // The mesh accents. Used for glow and state, never as a fill.
+        accent: {
+          emerald: '#10B981',
+          violet: '#8B5CF6',
+        },
 
-        // Legacy aliases kept so existing portfolio markup keeps compiling
-        'cream-bg': '#ECEBE9',
-        'dark-text': '#171512',
-        'soft-text': '#57514A',
+        // Semantic — lifted for a dark ground, all >=4.5:1 on surface.
+        success: { DEFAULT: '#5CD69A', bg: '#0F2019' },
+        warning: { DEFAULT: '#F2C260', bg: '#241C0D' },
+        danger: { DEFAULT: '#FB8B8B', bg: '#251315' },
+        info: { DEFAULT: '#86CDF2', bg: '#0E1E28' },
+
+        // Text that sits on a light pill (primary buttons, active nav).
+        'on-accent': '#050505',
+
+        // Legacy aliases kept so any missed markup keeps compiling
+        'cream-bg': '#050505',
+        'dark-text': '#F4F4F7',
+        'soft-text': '#A4A4B0',
       },
       fontFamily: {
-        sans: ['Manrope', 'system-ui', 'sans-serif'],
-        serif: ['Playfair Display', 'Georgia', 'serif'],
+        sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
+        display: ['Space Grotesk', 'Plus Jakarta Sans', 'system-ui', 'sans-serif'],
+        serif: ['Space Grotesk', 'Plus Jakarta Sans', 'system-ui', 'sans-serif'],
       },
       fontSize: {
         // Fixed rem scale for the CRM (ratio ~1.15), never fluid.
@@ -46,16 +60,24 @@ export default {
         page: ['1.5rem', { lineHeight: '1.9rem', letterSpacing: '-0.02em' }],
       },
       boxShadow: {
-        row: '0 1px 2px rgba(23,21,18,0.05)',
-        panel: '0 1px 3px rgba(23,21,18,0.06), 0 8px 24px -12px rgba(23,21,18,0.10)',
-        over: '0 12px 32px -8px rgba(23,21,18,0.22)',
+        // Depth on glass is an inner highlight and a wide ambient fall.
+        row: 'inset 0 1px 0 rgba(255,255,255,0.04)',
+        panel:
+          'inset 0 1px 0 rgba(255,255,255,0.06), 0 24px 60px -28px rgba(0,0,0,0.9)',
+        over:
+          'inset 0 1px 0 rgba(255,255,255,0.08), 0 40px 90px -24px rgba(0,0,0,0.95)',
+        edge: 'inset 0 1px 1px rgba(255,255,255,0.15)',
+        glow: '0 0 0 1px rgba(255,255,255,0.08), 0 18px 50px -18px rgba(16,185,129,0.35)',
       },
       borderRadius: {
-        control: '8px',
-        panel: '12px',
+        control: '10px',
+        panel: '16px',
+        shell: '2rem',
+        core: '1.625rem',
       },
       transitionTimingFunction: {
         out: 'cubic-bezier(0.16, 1, 0.3, 1)',
+        fluid: 'cubic-bezier(0.32, 0.72, 0, 1)',
       },
     },
   },

@@ -32,6 +32,7 @@ const Tasks = () => {
   const leads = useApi('/crm/leads/');
   const [creating, setCreating] = useState(false);
   const [showDone, setShowDone] = useState(false);
+  const [leaving, setLeaving] = useState(null); // task id animating out
 
   const tasks = useMemo(() => (Array.isArray(data) ? data : []), [data]);
   const { open, done } = useMemo(
@@ -44,6 +45,9 @@ const Tasks = () => {
 
   const toggle = async (task) => {
     const next = !task.is_done;
+    // Hold the row for one short beat so it leaves rather than vanishing.
+    setLeaving(task.id);
+    setTimeout(() => setLeaving(null), 160);
     setData(tasks.map((row) => (row.id === task.id ? { ...row, is_done: next } : row)));
     try {
       await api.patch(`/crm/tasks/${task.id}/`, { is_done: next });
@@ -63,7 +67,14 @@ const Tasks = () => {
     }
   };
 
-  const visible = showDone ? done : open;
+  const visible = useMemo(() => {
+    const base = showDone ? done : open;
+    if (leaving === null) return base;
+    const held = tasks.find((row) => row.id === leaving);
+    // Appended, not spliced back into position: it is on its way out, and the
+    // surviving rows should already have closed ranks behind it.
+    return held && !base.some((row) => row.id === leaving) ? [...base, held] : base;
+  }, [showDone, done, open, leaving, tasks]);
 
   return (
     <>
@@ -90,7 +101,7 @@ const Tasks = () => {
             className={cx(
               'h-8 rounded-control px-3 text-label font-medium transition-colors duration-150',
               showDone === value
-                ? 'bg-ink text-white'
+                ? 'bg-ink text-on-accent'
                 : 'border border-line-strong bg-surface text-ink-secondary hover:bg-surface-sunk'
             )}
           >
@@ -134,7 +145,13 @@ const Tasks = () => {
                 new Date(task.due_date) < new Date(new Date().toDateString());
               const priority = PRIORITY[task.priority] || PRIORITY.medium;
               return (
-                <li key={task.id} className="flex items-start gap-3 px-4 py-3.5">
+                <li
+                  key={task.id}
+                  className={cx(
+                    'flex items-start gap-3 px-4 py-3.5 transition-all duration-[160ms] ease-out',
+                    leaving === task.id ? 'translate-x-1.5 opacity-0' : 'translate-x-0 opacity-100'
+                  )}
+                >
                   <input
                     type="checkbox"
                     checked={task.is_done}

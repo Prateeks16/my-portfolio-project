@@ -51,7 +51,7 @@ const Analytics = () => {
             className={cx(
               'h-8 rounded-control px-3 text-label font-medium transition-colors duration-150',
               days === value
-                ? 'bg-ink text-white'
+                ? 'bg-ink text-on-accent'
                 : 'border border-line-strong bg-surface text-ink-secondary hover:bg-surface-sunk'
             )}
           >
@@ -103,11 +103,11 @@ const Analytics = () => {
                 >
                   <defs>
                     <linearGradient id="views" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#171512" stopOpacity={0.18} />
-                      <stop offset="100%" stopColor="#171512" stopOpacity={0.01} />
+                      <stop offset="0%" stopColor="#F4F4F7" stopOpacity={0.22} />
+                      <stop offset="100%" stopColor="#F4F4F7" stopOpacity={0.01} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid stroke="#E3DED6" vertical={false} />
+                  <CartesianGrid stroke="#1E1E23" vertical={false} />
                   <XAxis
                     dataKey="date"
                     tickFormatter={(value) =>
@@ -116,27 +116,29 @@ const Analytics = () => {
                         month: 'short',
                       })
                     }
-                    tick={{ fill: '#6B6259', fontSize: 11 }}
-                    axisLine={{ stroke: '#E3DED6' }}
+                    tick={{ fill: '#7C7C8A', fontSize: 11 }}
+                    axisLine={{ stroke: '#1E1E23' }}
                     tickLine={false}
                     minTickGap={28}
                   />
                   <YAxis
                     allowDecimals={false}
-                    tick={{ fill: '#6B6259', fontSize: 11 }}
+                    tick={{ fill: '#7C7C8A', fontSize: 11 }}
                     axisLine={false}
                     tickLine={false}
                     width={44}
                   />
                   <Tooltip
-                    cursor={{ stroke: '#CFC7BC', strokeWidth: 1 }}
+                    cursor={{ stroke: '#2F2F38', strokeWidth: 1 }}
                     contentStyle={{
                       borderRadius: 8,
-                      border: '1px solid #E3DED6',
-                      boxShadow: '0 12px 32px -8px rgba(23,21,18,0.22)',
+                      border: '1px solid #1E1E23',
+                      background: '#0C0C0F',
+                      boxShadow:
+                        'inset 0 1px 1px rgba(255,255,255,0.15), 0 40px 90px -24px rgba(0,0,0,0.95)',
                       fontSize: 13,
-                      fontFamily: 'Manrope, sans-serif',
-                      color: '#171512',
+                      fontFamily: "'Plus Jakarta Sans', sans-serif",
+                      color: '#F4F4F7',
                     }}
                     labelFormatter={(value) =>
                       new Date(value).toLocaleDateString('en-GB', {
@@ -150,10 +152,10 @@ const Analytics = () => {
                   <Area
                     type="monotone"
                     dataKey="views"
-                    stroke="#171512"
+                    stroke="#F4F4F7"
                     strokeWidth={1.75}
                     fill="url(#views)"
-                    activeDot={{ r: 4, fill: '#171512' }}
+                    activeDot={{ r: 4, fill: '#F4F4F7' }}
                   />
                 </AreaChart>
               </ResponsiveContainer>

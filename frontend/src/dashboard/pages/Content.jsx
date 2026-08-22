@@ -111,7 +111,7 @@ const Content = () => {
             className={cx(
               'inline-flex h-9 items-center gap-2 rounded-control px-3.5 text-body font-medium transition-colors duration-150',
               tab === key
-                ? 'bg-ink text-white'
+                ? 'bg-ink text-on-accent'
                 : 'border border-line-strong bg-surface text-ink-secondary hover:bg-surface-sunk'
             )}
           >

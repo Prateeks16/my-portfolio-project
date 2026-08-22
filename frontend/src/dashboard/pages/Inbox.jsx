@@ -122,7 +122,14 @@ const Inbox = () => {
           </Panel>
 
           {selected && (
-            <Panel>
+            /* Keyed on the message so switching selections replays the
+               entrance instead of silently swapping the body text. */
+            <div
+              key={selected.id}
+              className="animate-fadeIn"
+              style={{ animationDuration: '150ms' }}
+            >
+              <Panel>
               <header className="border-b border-line px-5 py-4">
                 <h2 className="text-panel font-semibold text-ink">{selected.subject}</h2>
                 <p className="mt-1 text-label text-ink-secondary">
@@ -155,12 +162,13 @@ const Inbox = () => {
                 </Button>
                 <Link
                   to={`/dashboard/outreach/compose?to=${encodeURIComponent(selected.email)}`}
-                  className="inline-flex h-9 items-center gap-2 rounded-control bg-ink px-3.5 text-body font-medium text-white transition-colors duration-150 hover:bg-ink-secondary"
+                  className="inline-flex h-9 items-center gap-2 rounded-full bg-ink px-4 text-body font-semibold text-on-accent transition-all duration-500 ease-fluid hover:bg-white active:scale-[0.98]"
                 >
                   <Send size={14} /> Reply
                 </Link>
               </div>
             </Panel>
+            </div>
           )}
         </div>
       )}

@@ -4,19 +4,24 @@ import { cx } from '../../lib/format';
 
 /* ---------------------------------------------------------------- surfaces */
 
+/**
+ * A panel is a glass plate seated in a machined tray: an outer shell carrying
+ * the hairline and the ambient fall, an inner core carrying the content and its
+ * own top-edge highlight. Radii are concentric, never nested-and-equal.
+ *
+ * `className` lands on the shell so callers keep positioning it; the core runs
+ * as a flex column so `mt-auto` footers inside pages still work.
+ */
 export const Panel = ({ className, children, ...rest }) => (
-  <section
-    className={cx('rounded-panel border border-line bg-surface shadow-row', className)}
-    {...rest}
-  >
-    {children}
+  <section className={cx('bezel-sm', className)} {...rest}>
+    <div className="bezel-sm-core flex h-full flex-col overflow-hidden">{children}</div>
   </section>
 );
 
 export const PanelHeader = ({ title, meta, action, className }) => (
   <header
     className={cx(
-      'flex items-center justify-between gap-4 border-b border-line px-4 py-3',
+      'flex shrink-0 items-center justify-between gap-4 border-b border-line px-4 py-3',
       className
     )}
   >
@@ -30,10 +35,16 @@ export const PanelHeader = ({ title, meta, action, className }) => (
 
 /* ---------------------------------------------------------------- controls */
 
+/**
+ * Buttons are pills that press. `icon` nests the glyph in its own circular well
+ * flush with the right padding — a trailing arrow never sits naked beside the
+ * label — and the well carries the kinetic tension while the pill scales down.
+ */
 export const Button = ({
   variant = 'primary',
   size = 'md',
   loading = false,
+  icon: Icon,
   className,
   children,
   disabled,
@@ -41,34 +52,61 @@ export const Button = ({
 }) => {
   const variants = {
     primary:
-      'bg-ink text-white hover:bg-ink-secondary active:bg-ink disabled:bg-line-strong disabled:text-white',
+      'bg-ink text-on-accent hover:bg-white disabled:bg-white/15 disabled:text-ink-tertiary',
     secondary:
-      'bg-surface text-ink border border-line-strong hover:border-ink-tertiary hover:bg-surface-sunk active:bg-line/40 disabled:text-ink-tertiary disabled:border-line',
+      'bg-white/[0.05] text-ink border border-white/10 hover:bg-white/[0.1] hover:border-white/20 disabled:text-ink-tertiary disabled:border-line',
     ghost:
-      'text-ink-secondary hover:bg-line/50 hover:text-ink active:bg-line disabled:text-ink-tertiary',
+      'text-ink-secondary hover:bg-white/[0.07] hover:text-ink disabled:text-ink-tertiary',
     danger:
-      'bg-surface text-danger border border-danger/30 hover:bg-danger-bg hover:border-danger active:bg-danger-bg disabled:text-ink-tertiary disabled:border-line',
+      'bg-danger-bg text-danger border border-danger/25 hover:border-danger/50 hover:bg-danger/15 disabled:text-ink-tertiary disabled:border-line',
+  };
+  const wells = {
+    primary: 'bg-black/10 group-hover:bg-black/[0.14]',
+    secondary: 'bg-white/10 group-hover:bg-white/[0.16]',
+    ghost: 'bg-white/10 group-hover:bg-white/[0.16]',
+    danger: 'bg-danger/15 group-hover:bg-danger/25',
   };
   const sizes = {
-    sm: 'h-8 px-2.5 text-label gap-1.5',
-    md: 'h-9 px-3.5 text-body gap-2',
-    lg: 'h-11 px-5 text-body gap-2',
+    sm: 'h-8 text-label gap-1.5',
+    md: 'h-9 text-body gap-2',
+    lg: 'h-11 text-body gap-2.5',
   };
+  const padding = {
+    sm: Icon ? 'pl-3 pr-1' : 'px-3',
+    md: Icon ? 'pl-4 pr-1' : 'px-4',
+    lg: Icon ? 'pl-5 pr-1.5' : 'px-5',
+  };
+  const wellSize = { sm: 'h-6 w-6', md: 'h-7 w-7', lg: 'h-8 w-8' };
+
   return (
     <button
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       className={cx(
-        'inline-flex items-center justify-center whitespace-nowrap rounded-control font-medium',
-        'transition-colors duration-150 ease-out disabled:cursor-not-allowed',
+        'group inline-flex items-center justify-center whitespace-nowrap rounded-full font-semibold',
+        'transition-all duration-500 ease-fluid active:scale-[0.98] disabled:cursor-not-allowed disabled:active:scale-100',
         variants[variant],
         sizes[size],
+        padding[size],
         className
       )}
       {...rest}
     >
       {loading && <Loader2 size={14} className="animate-spin" />}
       {children}
+      {Icon && (
+        <span
+          aria-hidden="true"
+          className={cx(
+            'flex items-center justify-center rounded-full transition-all duration-700 ease-fluid',
+            'group-hover:translate-x-0.5 group-hover:-translate-y-[1px] group-hover:scale-105',
+            wellSize[size],
+            wells[variant]
+          )}
+        >
+          <Icon size={14} />
+        </span>
+      )}
     </button>
   );
 };
@@ -77,53 +115,53 @@ export const Field = ({ label, hint, error, children, className, htmlFor }) => (
   <div className={cx('block', className)}>
     <label
       htmlFor={htmlFor}
-      className="mb-1.5 block text-label font-semibold text-ink-secondary"
+      className="mb-2 block text-[0.625rem] font-medium uppercase tracking-[0.16em] text-ink-tertiary"
     >
       {label}
     </label>
     {children}
     {error ? (
-      <p className="mt-1 text-label text-danger">{error}</p>
+      <p className="mt-1.5 text-label text-danger">{error}</p>
     ) : (
-      hint && <p className="mt-1 text-label text-ink-tertiary">{hint}</p>
+      hint && <p className="mt-1.5 text-label text-ink-tertiary">{hint}</p>
     )}
   </div>
 );
 
 const control =
-  'w-full rounded-control border bg-surface px-3 text-body text-ink placeholder:text-ink-tertiary ' +
-  'transition-colors duration-150 ease-out border-line-strong hover:border-ink-tertiary ' +
-  'focus:border-ink focus:outline-none focus:ring-1 focus:ring-ink ' +
-  'disabled:cursor-not-allowed disabled:bg-surface-sunk disabled:text-ink-tertiary ' +
-  'aria-[invalid=true]:border-danger aria-[invalid=true]:ring-danger';
+  'w-full rounded-control border bg-white/[0.03] px-3 text-body text-ink placeholder:text-ink-tertiary ' +
+  'transition-all duration-500 ease-fluid border-white/10 hover:border-white/20 ' +
+  'focus:border-white/30 focus:bg-white/[0.06] focus:outline-none ' +
+  'disabled:cursor-not-allowed disabled:bg-white/[0.02] disabled:text-ink-tertiary ' +
+  'aria-[invalid=true]:border-danger/60';
 
 export const Input = ({ className, ...rest }) => (
-  <input className={cx(control, 'h-9', className)} {...rest} />
+  <input className={cx(control, 'h-10', className)} {...rest} />
 );
 
 export const Textarea = ({ className, ...rest }) => (
-  <textarea className={cx(control, 'resize-y py-2 leading-relaxed', className)} {...rest} />
+  <textarea className={cx(control, 'resize-y py-2.5 leading-relaxed', className)} {...rest} />
 );
 
 export const Select = ({ className, children, ...rest }) => (
-  <select className={cx(control, 'h-9 pr-8', className)} {...rest}>
+  <select className={cx(control, 'h-10 pr-8 [&>option]:bg-surface', className)} {...rest}>
     {children}
   </select>
 );
 
 export const Badge = ({ tone = 'neutral', className, children }) => {
   const tones = {
-    neutral: 'border-line-strong bg-surface-sunk text-ink-secondary',
+    neutral: 'border-white/10 bg-white/[0.05] text-ink-secondary',
     success: 'border-success/25 bg-success-bg text-success',
     warning: 'border-warning/25 bg-warning-bg text-warning',
     danger: 'border-danger/25 bg-danger-bg text-danger',
     info: 'border-info/25 bg-info-bg text-info',
-    solid: 'border-ink bg-ink text-white',
+    solid: 'border-transparent bg-ink text-on-accent',
   };
   return (
     <span
       className={cx(
-        'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-micro font-semibold uppercase',
+        'inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-micro font-semibold uppercase',
         tones[tone],
         className
       )}
@@ -167,7 +205,7 @@ export const ColdStartNote = ({ delay = 8000 }) => {
   }, [delay]);
   if (!show) return null;
   return (
-    <p className="border-t border-line px-4 py-3 text-label text-ink-tertiary">
+    <p className="animate-fadeIn border-t border-line px-4 py-3 text-label text-ink-tertiary">
       Still waiting on the server. It sleeps when idle and can take up to a minute
       to wake — this only happens on the first request.
     </p>
@@ -183,17 +221,17 @@ export const LoadingPanel = ({ rows = 5, label }) => (
 );
 
 export const EmptyState = ({ icon: Icon = Inbox, title, message, action }) => (
-  <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
-    <span className="mb-3.5 rounded-full bg-surface-sunk p-3 ring-1 ring-line">
-      <Icon size={20} className="text-ink-tertiary" strokeWidth={1.75} />
+  <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+    <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/[0.04]">
+      <Icon size={20} className="text-ink-tertiary" />
     </span>
     <p className="text-panel font-semibold text-ink">{title}</p>
     {message && (
-      <p className="mt-1.5 max-w-sm text-body leading-relaxed text-ink-secondary">
+      <p className="mt-2 max-w-sm text-body leading-relaxed text-ink-secondary">
         {message}
       </p>
     )}
-    {action && <div className="mt-5">{action}</div>}
+    {action && <div className="mt-6">{action}</div>}
   </div>
 );
 
@@ -201,9 +239,10 @@ export const ErrorNote = ({ children, onRetry }) =>
   children ? (
     <div
       role="alert"
-      className="flex items-start gap-2.5 rounded-control border border-danger/30 bg-danger-bg px-3.5 py-3 text-body text-danger"
+      style={{ animationDuration: '150ms' }}
+      className="animate-fadeIn flex items-start gap-2.5 rounded-control border border-danger/25 bg-danger-bg px-3.5 py-3 text-body text-danger"
     >
-      <AlertCircle size={16} className="mt-0.5 shrink-0" strokeWidth={2} />
+      <AlertCircle size={16} className="mt-0.5 shrink-0" />
       <span className="flex-1 leading-relaxed">{children}</span>
       {onRetry && (
         <button
@@ -223,7 +262,13 @@ export const Note = ({ tone = 'info', children }) => {
     success: 'border-success/25 bg-success-bg text-success',
   };
   return (
-    <div className={cx('rounded-control border px-3.5 py-3 text-body leading-relaxed', tones[tone])}>
+    <div
+      style={{ animationDuration: '150ms' }}
+      className={cx(
+        'animate-fadeIn rounded-control border px-3.5 py-3 text-body leading-relaxed',
+        tones[tone]
+      )}
+    >
       {children}
     </div>
   );
@@ -236,6 +281,26 @@ export const Note = ({ tone = 'info', children }) => {
  * confirmation, and confirming a send. Everything else is inline or a route.
  */
 export const Modal = ({ open, onClose, title, description, children, width = 'max-w-lg' }) => {
+  // `render` keeps the dialog in the DOM long enough to animate out. The
+  // entrance needs no mount flag: `@starting-style` supplies the from-state,
+  // and `data-state` carries the exit. Transitions rather than keyframes, so a
+  // modal toggled rapidly retargets from where it is instead of restarting.
+  const [render, setRender] = useState(open);
+  const [wasOpen, setWasOpen] = useState(open);
+
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setRender(true);
+  }
+
+  useEffect(() => {
+    if (open) return undefined;
+    const timer = setTimeout(() => setRender(false), 150);
+    return () => clearTimeout(timer);
+  }, [open]);
+
+  // Keyed on `open`, not `render`: body scroll unlocks the moment the user
+  // dismisses, not after the exit finishes.
   useEffect(() => {
     if (!open) return undefined;
     const onKey = (event) => event.key === 'Escape' && onClose?.();
@@ -247,36 +312,39 @@ export const Modal = ({ open, onClose, title, description, children, width = 'ma
     };
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!render) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-ink/40 p-4">
+    <div
+      data-state={open ? 'open' : 'closed'}
+      className="modal-scrim fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-2xl"
+    >
       <div
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={cx(
-          'w-full animate-fadeIn rounded-panel border border-line bg-surface shadow-over',
-          width
-        )}
+        data-state={open ? 'open' : 'closed'}
+        className={cx('modal-panel bezel w-full shadow-over', width)}
       >
-        <header className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
-          <div>
-            <h2 className="text-panel font-semibold text-ink">{title}</h2>
-            {description && (
-              <p className="mt-1 text-label leading-relaxed text-ink-secondary">
-                {description}
-              </p>
-            )}
-          </div>
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            className="rounded-control p-1.5 text-ink-tertiary transition-colors duration-150 hover:bg-line/60 hover:text-ink"
-          >
-            <X size={17} />
-          </button>
-        </header>
-        <div className="px-5 py-5">{children}</div>
+        <div className="bezel-core">
+          <header className="flex items-start justify-between gap-4 border-b border-line px-6 py-5">
+            <div>
+              <h2 className="text-panel font-semibold text-ink">{title}</h2>
+              {description && (
+                <p className="mt-1.5 text-label leading-relaxed text-ink-secondary">
+                  {description}
+                </p>
+              )}
+            </div>
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-tertiary transition-all duration-500 ease-fluid hover:bg-white/[0.08] hover:text-ink"
+            >
+              <X size={16} />
+            </button>
+          </header>
+          <div className="px-6 py-6">{children}</div>
+        </div>
       </div>
     </div>
   );
@@ -285,11 +353,11 @@ export const Modal = ({ open, onClose, title, description, children, width = 'ma
 /* ------------------------------------------------------------------ layout */
 
 export const PageHeading = ({ title, description, action }) => (
-  <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+  <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
     <div>
-      <h1 className="text-page font-semibold text-ink">{title}</h1>
+      <h1 className="display-face text-page font-semibold text-ink">{title}</h1>
       {description && (
-        <p className="prose-measure mt-1.5 text-body leading-relaxed text-ink-secondary">
+        <p className="prose-measure mt-2 text-body leading-relaxed text-ink-secondary">
           {description}
         </p>
       )}
