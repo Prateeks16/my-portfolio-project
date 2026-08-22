@@ -12,7 +12,6 @@ portfolio lays those out as full-width text.
 import datetime
 
 from django.core.management.base import BaseCommand
-from django.utils import timezone
 
 from api.models import Project
 

@@ -178,7 +178,7 @@ export const SkeletonLine = ({ className }) => (
   <div className={cx('skeleton h-3', className)} />
 );
 
-export const SkeletonRows = ({ rows = 5, className }) => (
+const SkeletonRows = ({ rows = 5, className }) => (
   <div className={cx('divide-y divide-line', className)} aria-hidden="true">
     {Array.from({ length: rows }).map((_, index) => (
       <div key={index} className="flex items-center gap-4 px-4 py-3.5">
@@ -197,7 +197,7 @@ export const SkeletonRows = ({ rows = 5, className }) => (
  * Render on Render's free tier and the first request can take ~60s. Silence for
  * that long reads as breakage, so after 8s the skeleton explains itself.
  */
-export const ColdStartNote = ({ delay = 8000 }) => {
+const ColdStartNote = ({ delay = 8000 }) => {
   const [show, setShow] = useState(false);
   useEffect(() => {
     const timer = setTimeout(() => setShow(true), delay);
