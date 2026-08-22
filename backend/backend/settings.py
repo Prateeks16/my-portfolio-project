@@ -217,7 +217,14 @@ EMAIL_BACKEND = os.environ.get(
 )
 EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
-EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
+# Gmail answers on 587 with STARTTLS and on 465 with implicit SSL. Some hosts
+# block one and not the other, so 465 is a two-variable fallback rather than a
+# code change: set EMAIL_PORT=465 and EMAIL_USE_SSL=True. Django refuses to
+# start if both are on, so SSL wins and TLS is forced off.
+EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'False') == 'True'
+EMAIL_USE_TLS = (
+    False if EMAIL_USE_SSL else os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
+)
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '').strip()
 # Google shows App Passwords as four spaced groups ("abcd efgh ijkl mnop") and
 # the spaces are display only -- pasted in verbatim they fail authentication

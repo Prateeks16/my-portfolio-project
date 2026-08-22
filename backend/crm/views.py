@@ -1,3 +1,5 @@
+import logging
+
 from django.conf import settings
 from django.utils import timezone
 from rest_framework import status, viewsets
@@ -47,6 +49,8 @@ from .services import (
     pipeline_summary,
     send_outreach_email,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _device_from_user_agent(user_agent):
@@ -262,10 +266,16 @@ class OutreachEmailViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_409_CONFLICT,
             )
         except Exception as exc:  # network, auth, malformed address
+            # str() on an SMTP exception is often just a status tuple, which
+            # says nothing in a log. The traceback is what identifies whether
+            # this was a refused sender, a blocked port or a dropped
+            # connection, so it goes to the platform log in full.
+            logger.exception('Send failed for OutreachEmail %s', email.pk)
+            detail = '%s: %s' % (exc.__class__.__name__, exc)
             email.status = 'failed'
-            email.error_message = str(exc)
+            email.error_message = detail
             email.save(update_fields=['status', 'error_message', 'updated_at'])
-            return Response({'detail': str(exc), 'code': 'send_failed'},
+            return Response({'detail': detail, 'code': 'send_failed'},
                             status=status.HTTP_502_BAD_GATEWAY)
         return Response(OutreachEmailSerializer(email).data)
 
