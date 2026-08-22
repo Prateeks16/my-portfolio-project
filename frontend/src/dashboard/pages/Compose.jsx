@@ -146,6 +146,14 @@ const Compose = () => {
     }
   };
 
+  /**
+   * Saves and returns the draft's id, rather than a bare success flag.
+   *
+   * `setSavedId` does not update the binding a caller already closed over, so a
+   * send that saved first and then read `savedId` was reading null on a draft
+   * that had never been saved before — and posting to /emails/null/send/.
+   * Handing the id back keeps the caller off the state entirely.
+   */
   const saveDraft = async () => {
     setBusy('save');
     setError(null);
@@ -160,18 +168,20 @@ const Compose = () => {
       status: 'draft',
     };
     try {
-      if (savedId) {
-        await api.patch(`/crm/emails/${savedId}/`, payload);
+      let id = savedId;
+      if (id) {
+        await api.patch(`/crm/emails/${id}/`, payload);
       } else {
         const { data } = await api.post('/crm/emails/', payload);
-        setSavedId(data.id);
-        navigate(`/dashboard/outreach/compose?email=${data.id}`, { replace: true });
+        id = data.id;
+        setSavedId(id);
+        navigate(`/dashboard/outreach/compose?email=${id}`, { replace: true });
       }
       setFlash('Draft saved.');
-      return true;
+      return id;
     } catch (caught) {
       setError(apiError(caught));
-      return false;
+      return null;
     } finally {
       setBusy(null);
     }
@@ -179,12 +189,12 @@ const Compose = () => {
 
   const send = async () => {
     setConfirmSend(false);
-    const ok = await saveDraft();
-    if (!ok) return;
+    const id = await saveDraft();
+    if (!id) return;
     setBusy('send');
     setError(null);
     try {
-      const { data } = await api.post(`/crm/emails/${savedId}/send/`);
+      const { data } = await api.post(`/crm/emails/${id}/send/`);
       setStatus(data.status);
       setSentAt(data.sent_at);
       setFlash(`Sent to ${data.to_email}.`);
