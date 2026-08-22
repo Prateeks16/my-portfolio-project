@@ -207,6 +207,16 @@ SIMPLE_JWT = {
 }
 
 
+def _env_value(name, default=''):
+    """Read an env var, tolerating quotes someone wrapped a value in.
+
+    Dashboard env panels are not shells: they store what you type, quotes
+    included. A value entered as "prateeks16.outreach@gmail.com" then fails
+    authentication for a reason nothing in the error message hints at.
+    """
+    return os.environ.get(name, default).strip().strip('"\'').strip()
+
+
 # --- OUTBOUND EMAIL ---
 # Sending is opt-in. With no credentials set, the CRM still drafts and stores
 # emails but the send endpoint refuses with a clear message instead of failing
@@ -215,27 +225,31 @@ SIMPLE_JWT = {
 EMAIL_BACKEND = os.environ.get(
     'EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend'
 )
-EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_HOST = _env_value('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
-# Gmail answers on 587 with STARTTLS and on 465 with implicit SSL. Some hosts
-# block one and not the other, so 465 is a two-variable fallback rather than a
-# code change: set EMAIL_PORT=465 and EMAIL_USE_SSL=True. Django refuses to
-# start if both are on, so SSL wins and TLS is forced off.
-EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'False') == 'True'
+# Gmail answers on 587 with STARTTLS and on 465 with implicit SSL, and the two
+# are not interchangeable: pointing a STARTTLS client at 465 does not fail, it
+# hangs until something times out. So the port picks the mode by default and
+# switching host is one variable, not a matched pair anyone can get wrong.
+# An explicit EMAIL_USE_SSL still overrides. Django refuses to start with both
+# enabled, so SSL wins and TLS is forced off rather than left as a trap.
+EMAIL_USE_SSL = os.environ.get(
+    'EMAIL_USE_SSL', 'True' if EMAIL_PORT == 465 else 'False'
+) == 'True'
 EMAIL_USE_TLS = (
     False if EMAIL_USE_SSL else os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
 )
-EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '').strip()
+EMAIL_HOST_USER = _env_value('EMAIL_HOST_USER')
 # Google shows App Passwords as four spaced groups ("abcd efgh ijkl mnop") and
 # the spaces are display only -- pasted in verbatim they fail authentication
 # with a message that says nothing about whitespace. Stripped here so the
 # obvious copy-paste is simply correct.
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '').replace(' ', '')
+EMAIL_HOST_PASSWORD = _env_value('EMAIL_HOST_PASSWORD').replace(' ', '')
 # Without this a stalled SMTP connection hangs the request until the platform
 # cuts it, which reaches the dashboard as "could not reach the server" and hides
 # whatever actually went wrong. Fail fast and report the real error instead.
 EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', '20'))
-DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
+DEFAULT_FROM_EMAIL = _env_value('DEFAULT_FROM_EMAIL') or EMAIL_HOST_USER
 # The display name recipients see. Without it Gmail shows the bare address,
 # which reads like a script rather than a person.
 #
@@ -245,7 +259,7 @@ DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
 # "\"Prateek Sahu\"" <address>. Valid, and visibly wrong to every recipient.
 DEFAULT_FROM_NAME = os.environ.get('DEFAULT_FROM_NAME', '').strip().strip('"\'')
 # Where replies should go if it differs from the sending mailbox.
-REPLY_TO_EMAIL = os.environ.get('REPLY_TO_EMAIL', '')
+REPLY_TO_EMAIL = _env_value('REPLY_TO_EMAIL')
 
 
 # --- INBOUND EMAIL (IMAP) ---
@@ -253,7 +267,7 @@ REPLY_TO_EMAIL = os.environ.get('REPLY_TO_EMAIL', '')
 # back into the CRM. Same credentials as sending -- Gmail accepts one App
 # Password for both SMTP and IMAP, so enabling sending enables receiving.
 # IMAP must also be switched on in Gmail: Settings -> Forwarding and POP/IMAP.
-IMAP_HOST = os.environ.get('IMAP_HOST', 'imap.gmail.com')
+IMAP_HOST = _env_value('IMAP_HOST', 'imap.gmail.com')
 IMAP_PORT = int(os.environ.get('IMAP_PORT', '993'))
 IMAP_USE_SSL = os.environ.get('IMAP_USE_SSL', 'True') == 'True'
 IMAP_FOLDER = os.environ.get('IMAP_FOLDER', 'INBOX')
