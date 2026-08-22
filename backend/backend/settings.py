@@ -238,7 +238,12 @@ EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', '20'))
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
 # The display name recipients see. Without it Gmail shows the bare address,
 # which reads like a script rather than a person.
-DEFAULT_FROM_NAME = os.environ.get('DEFAULT_FROM_NAME', '')
+#
+# Quotes are stripped because dashboard panels take the value literally, so a
+# name entered as "Prateek Sahu" -- the natural thing to type for a value with a
+# space in it -- arrives with the quotes still attached and goes out as
+# "\"Prateek Sahu\"" <address>. Valid, and visibly wrong to every recipient.
+DEFAULT_FROM_NAME = os.environ.get('DEFAULT_FROM_NAME', '').strip().strip('"\'')
 # Where replies should go if it differs from the sending mailbox.
 REPLY_TO_EMAIL = os.environ.get('REPLY_TO_EMAIL', '')
 
