@@ -4,6 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 
 import './index.css';
 import { AuthProvider, RequireAuth } from './lib/auth';
+import { SECTION_ROUTES } from './lib/sectionRoute';
 import Portfolio from './portfolio/Portfolio';
 
 /**
@@ -18,6 +19,7 @@ const Analytics = lazy(() => import('./dashboard/pages/Analytics'));
 const Leads = lazy(() => import('./dashboard/pages/Leads'));
 const LeadDetail = lazy(() => import('./dashboard/pages/LeadDetail'));
 const Inbox = lazy(() => import('./dashboard/pages/Inbox'));
+const Mail = lazy(() => import('./dashboard/pages/Mail'));
 const Outreach = lazy(() => import('./dashboard/pages/Outreach'));
 const Compose = lazy(() => import('./dashboard/pages/Compose'));
 const Templates = lazy(() => import('./dashboard/pages/Templates'));
@@ -42,7 +44,22 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       <AuthProvider>
         <Suspense fallback={<RouteFallback />}>
           <Routes>
-            <Route path="/" element={<Portfolio />} />
+            {/*
+              One page, several addresses. Each section of the portfolio is a
+              real URL that can be linked, indexed and shared -- the component
+              is the same, and it scrolls itself to the right place.
+            */}
+            {SECTION_ROUTES.map(({ path }) => (
+              <Route key={path} path={path} element={<Portfolio />} />
+            ))}
+
+            {/*
+              An unlisted door to the CRM. The footer no longer advertises it, so
+              this is what you type when you want in. It is a convenience, not a
+              security boundary — the login is the boundary, and this only skips
+              the part where you remember the real path.
+            */}
+            <Route path="/shell" element={<Navigate to="/dashboard" replace />} />
 
             <Route path="/dashboard/login" element={<Login />} />
             <Route
@@ -58,6 +75,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
               <Route path="leads" element={<Leads />} />
               <Route path="leads/:id" element={<LeadDetail />} />
               <Route path="inbox" element={<Inbox />} />
+              <Route path="mail" element={<Mail />} />
               <Route path="outreach" element={<Outreach />} />
               <Route path="outreach/compose" element={<Compose />} />
               <Route path="templates" element={<Templates />} />

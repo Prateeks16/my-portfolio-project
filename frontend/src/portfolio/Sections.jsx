@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   ArrowUpRight,
   Award,
@@ -21,7 +22,7 @@ import { getImageUrl } from './usePortfolio';
 
 /* Skills come from the resume; the skills tables in the database are empty and
    inventing rows there would put unverified claims on the public site. */
-export const SKILL_GROUPS = [
+const SKILL_GROUPS = [
   { name: 'Languages', items: ['Python', 'Java', 'SQL', 'JavaScript', 'Go'] },
   { name: 'Frameworks', items: ['Django', 'FastAPI', 'React', 'Streamlit', 'Spring Boot'] },
   {
@@ -201,10 +202,12 @@ export const Hero = ({ profile, loading }) => {
               style={{ animationDelay: '200ms' }}
             >
               <span ref={workPill} className="inline-block will-change-transform">
-                <Pill href="#work">See the work</Pill>
+                <Pill as={Link} to="/work">
+                  See the work
+                </Pill>
               </span>
               <span ref={contactPill} className="inline-block will-change-transform">
-                <Pill tone="glass" href="#contact">
+                <Pill as={Link} tone="glass" to="/contact">
                   Get in touch
                 </Pill>
               </span>

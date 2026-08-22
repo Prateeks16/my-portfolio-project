@@ -55,6 +55,12 @@
     background-color: var(--paper);
   }
 
+  /* Every section is a route target, and the nav island floats over the top of
+     the page. Without this, landing on /contact puts the heading under it. */
+  section[id] {
+    scroll-margin-top: 6rem;
+  }
+
   body {
     background-color: var(--paper);
     color: var(--ink);

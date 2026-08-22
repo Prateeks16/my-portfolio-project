@@ -71,7 +71,7 @@ const Inbox = () => {
             message="When someone fills in the contact form on your portfolio, their message appears here."
             action={
               <a
-                href="/#contact"
+                href="/contact"
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex h-9 items-center gap-2 rounded-control border border-line-strong bg-surface px-3.5 text-body font-medium text-ink transition-colors duration-150 hover:bg-surface-sunk"
