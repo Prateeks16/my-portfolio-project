@@ -152,6 +152,40 @@ class MailLoopTest(TestCase):
         self.assertIsNotNone(first.lead_id)
         self.assertEqual(second.lead_id, first.lead_id)
 
+    def test_contact_form_notification_replies_to_the_visitor(self):
+        from api.models import ContactSubmission
+        from crm.services import notify_contact_submission
+
+        submission = ContactSubmission.objects.create(
+            name='Priya Mehta', email='priya@acme-hire.com',
+            subject='Backend role', message='Are you free Tuesday?',
+        )
+        django_mail.outbox.clear()
+        self.assertTrue(notify_contact_submission(submission))
+
+        sent = django_mail.outbox[0]
+        # Sent from the account to itself so Gmail accepts it and it lands in
+        # the inbox; Reply-To is what makes Reply answer the visitor instead.
+        self.assertEqual(sent.to, ['me@gmail.com'])
+        self.assertEqual(sent.from_email, 'me@gmail.com')
+        self.assertEqual(sent.reply_to, ['Priya Mehta <priya@acme-hire.com>'])
+        self.assertEqual(sent.subject, '[Portfolio] Backend role')
+        self.assertIn('Are you free Tuesday?', sent.body)
+
+    def test_contact_notification_never_breaks_the_form(self):
+        from api.models import ContactSubmission
+        from crm.services import notify_contact_submission
+
+        submission = ContactSubmission.objects.create(
+            name='X', email='x@y.com', subject='s', message='m',
+        )
+        with mock.patch.object(
+            EmailMultiAlternatives, 'send', side_effect=OSError('smtp down')
+        ):
+            # Returns False rather than raising: the submission is already
+            # stored, and a visitor must never see the form fail over this.
+            self.assertFalse(notify_contact_submission(submission))
+
     def test_rejected_credentials_keep_the_draft_and_explain_themselves(self):
         draft = OutreachEmail.objects.create(
             to_email='x@y.com', subject='s', body='b',

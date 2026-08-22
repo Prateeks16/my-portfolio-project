@@ -1,9 +1,12 @@
+import threading
+
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from rest_framework.decorators import api_view
 from .models import Project, Skill, Achievement, ContactSubmission, Experience, SkillCategory, Profile
-from .serializers import ProjectSerializer, SkillSerializer, AchievementSerializer, ContactSubmissionSerializer, ExperienceSerializer, SkillCategorySerializer, ProfileSerializer   
+from .serializers import ProjectSerializer, SkillSerializer, AchievementSerializer, ContactSubmissionSerializer, ExperienceSerializer, SkillCategorySerializer, ProfileSerializer
+from crm.services import notify_contact_submission
 
 # Create your views here.
 class ProjectViewSet(viewsets.ReadOnlyModelViewSet):
@@ -54,6 +57,16 @@ class ContactSubmissionViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
+
+        # The message is stored either way; this is so it also shows up in Gmail,
+        # where it will actually be noticed. Off the request thread because the
+        # visitor should not wait on an SMTP round trip to a possibly cold
+        # mailbox, and should never see their message fail over a notification.
+        threading.Thread(
+            target=notify_contact_submission,
+            args=(serializer.instance,),
+            daemon=True,
+        ).start()
 
         # Return success message
         return Response(

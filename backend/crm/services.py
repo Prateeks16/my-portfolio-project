@@ -2,6 +2,7 @@
 
 import datetime
 import html as html_module
+import logging
 import json
 import smtplib
 import urllib.error
@@ -15,6 +16,9 @@ from django.db.models.functions import TruncDate
 from django.utils import timezone
 
 from .models import Activity, Lead, OutreachEmail, PageView, TrackedEvent
+
+
+logger = logging.getLogger(__name__)
 
 
 class MailNotConfigured(Exception):
@@ -119,6 +123,57 @@ def send_outreach_email(email):
             body=email.body,
         )
     return email
+
+
+def notify_contact_submission(submission):
+    """Forward a contact-form message into the mailbox as real email.
+
+    The submission is already stored and visible in the dashboard Inbox; this is
+    so it also lands in Gmail, where you actually notice things. Sent from the
+    account to itself, with Reply-To set to whoever wrote in -- so hitting Reply
+    in Gmail answers them, not you.
+
+    Never raises. The message is saved before this runs, and a visitor should
+    not see their form fail because a notification could not go out.
+    """
+    if not mail_is_configured():
+        return False
+
+    address = settings.EMAIL_HOST_USER
+    body = (
+        'From: %s <%s>\n'
+        'Subject: %s\n'
+        '\n'
+        '%s\n'
+        '\n'
+        '--\n'
+        'Sent from the contact form on %s\n'
+        'Reply to this email to answer them directly.'
+    ) % (
+        submission.name,
+        submission.email,
+        submission.subject,
+        submission.message,
+        getattr(settings, 'PORTFOLIO_URL', 'https://prateeks16.in'),
+    )
+
+    try:
+        message = EmailMultiAlternatives(
+            # Prefixed so it can be filtered and starred in Gmail on sight.
+            subject='[Portfolio] %s' % submission.subject,
+            body=body,
+            from_email=address,
+            to=[address],
+            # The whole point: Reply in Gmail goes to the visitor.
+            reply_to=[formataddr((submission.name, submission.email))],
+            connection=get_connection(),
+        )
+        message.attach_alternative(_html_body(body), 'text/html')
+        message.send(fail_silently=False)
+    except Exception:
+        logger.exception('Contact notification failed for submission %s', submission.pk)
+        return False
+    return True
 
 
 def analytics_overview(days=30):

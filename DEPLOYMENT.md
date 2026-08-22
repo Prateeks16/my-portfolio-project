@@ -219,6 +219,21 @@ A reply that matches something you sent stamps `replied_at` on the lead and move
 to *Replied* — but only from New, Contacted or Applied. An answer never drags a lead
 backwards out of Interviewing, Offer, Won or Lost.
 
+### Contact-form messages
+
+A form submission is stored and shown in the dashboard **Inbox** regardless of mail
+settings. Once credentials exist it is also forwarded into the mailbox as real email,
+subject-prefixed `[Portfolio]`, so it turns up in Gmail where you will actually see
+it. `Reply-To` is set to whoever wrote in, so pressing Reply in Gmail answers *them*,
+not yourself.
+
+It is sent on a background thread and never raises: the submission is saved first,
+and a visitor must not see the form fail because a notification could not go out. If
+mail is unconfigured or SMTP is down, the message is still in the Inbox.
+
+The IMAP sync skips messages sent from your own address, so these notifications do
+not come back round as duplicates on the Mail screen.
+
 ### Keeping the inbox current
 
 The Mail screen syncs itself when you open it and the last run is more than three
