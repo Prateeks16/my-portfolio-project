@@ -296,8 +296,23 @@ def sync_mailbox(days=None, folder=None, limit=None):
     client = None
     try:
         opener = imaplib.IMAP4_SSL if settings.IMAP_USE_SSL else imaplib.IMAP4
-        client = opener(settings.IMAP_HOST, settings.IMAP_PORT)
-        client.login(settings.EMAIL_HOST_USER, settings.EMAIL_HOST_PASSWORD)
+        client = opener(
+            settings.IMAP_HOST,
+            settings.IMAP_PORT,
+            timeout=getattr(settings, 'IMAP_TIMEOUT', 20),
+        )
+        try:
+            client.login(settings.EMAIL_HOST_USER, settings.EMAIL_HOST_PASSWORD)
+        except imaplib.IMAP4.error as exc:
+            # The raw message is '[AUTHENTICATIONFAILED] Invalid credentials',
+            # which is accurate and completely unactionable. Say what to check.
+            raise imaplib.IMAP4.error(
+                'Gmail rejected the credentials for %s. Check that 2-Step '
+                'Verification is on, that EMAIL_HOST_PASSWORD is a 16-character '
+                'App Password (not the account password), and that it was created '
+                'under this same Google account. Original error: %s'
+                % (settings.EMAIL_HOST_USER, exc)
+            ) from exc
         # Read-only: belt and braces on top of BODY.PEEK, so a sync can never
         # change what is unread in the real mailbox.
         client.select(folder, readonly=True)

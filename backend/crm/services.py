@@ -3,6 +3,7 @@
 import datetime
 import html as html_module
 import json
+import smtplib
 import urllib.error
 import urllib.request
 from email.utils import formataddr, make_msgid
@@ -85,7 +86,19 @@ def send_outreach_email(email):
         reply_to=[reply_to] if reply_to else None,
     )
     message.attach_alternative(_html_body(email.body), 'text/html')
-    message.send(fail_silently=False)
+    try:
+        message.send(fail_silently=False)
+    except smtplib.SMTPAuthenticationError as exc:
+        # Same credentials as IMAP, so the same advice applies. Raised as a
+        # configuration problem rather than a send failure, because retrying
+        # the draft will not help until the password is fixed.
+        raise MailNotConfigured(
+            'Gmail rejected the credentials for %s. Check that 2-Step '
+            'Verification is on, that EMAIL_HOST_PASSWORD is a 16-character '
+            'App Password (not the account password), and that it was created '
+            'under this same Google account. Original error: %s'
+            % (address, exc)
+        ) from exc
 
     email.status = 'sent'
     email.sent_at = timezone.now()

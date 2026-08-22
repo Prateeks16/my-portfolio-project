@@ -218,8 +218,16 @@ EMAIL_BACKEND = os.environ.get(
 EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
 EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
-EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '').strip()
+# Google shows App Passwords as four spaced groups ("abcd efgh ijkl mnop") and
+# the spaces are display only -- pasted in verbatim they fail authentication
+# with a message that says nothing about whitespace. Stripped here so the
+# obvious copy-paste is simply correct.
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '').replace(' ', '')
+# Without this a stalled SMTP connection hangs the request until the platform
+# cuts it, which reaches the dashboard as "could not reach the server" and hides
+# whatever actually went wrong. Fail fast and report the real error instead.
+EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', '20'))
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
 # The display name recipients see. Without it Gmail shows the bare address,
 # which reads like a script rather than a person.
@@ -242,6 +250,9 @@ IMAP_FOLDER = os.environ.get('IMAP_FOLDER', 'INBOX')
 IMAP_SYNC_DAYS = int(os.environ.get('IMAP_SYNC_DAYS', '14'))
 # Hard ceiling per sync so one run can never hang on a busy mailbox.
 IMAP_MAX_MESSAGES = int(os.environ.get('IMAP_MAX_MESSAGES', '80'))
+# Same reasoning as EMAIL_TIMEOUT: a sync that cannot connect should say so
+# rather than holding the request open until something upstream gives up.
+IMAP_TIMEOUT = int(os.environ.get('IMAP_TIMEOUT', '20'))
 
 
 # --- CRM ---

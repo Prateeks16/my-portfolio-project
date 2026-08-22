@@ -1,8 +1,11 @@
 """End-to-end check of the mail loop against an isolated test database."""
 
 import email as email_mod
+import smtplib
+from unittest import mock
 
 from django.contrib.auth.models import User
+from django.core.mail import EmailMultiAlternatives
 from django.core import mail as django_mail
 from django.test import TestCase, override_settings
 
@@ -148,6 +151,26 @@ class MailLoopTest(TestCase):
         second.refresh_from_db()
         self.assertIsNotNone(first.lead_id)
         self.assertEqual(second.lead_id, first.lead_id)
+
+    def test_rejected_credentials_keep_the_draft_and_explain_themselves(self):
+        draft = OutreachEmail.objects.create(
+            to_email='x@y.com', subject='s', body='b',
+        )
+        failure = smtplib.SMTPAuthenticationError(
+            535, b'5.7.8 Username and Password not accepted'
+        )
+        with mock.patch.object(
+            EmailMultiAlternatives, 'send', side_effect=failure
+        ):
+            response = self.client.post('/api/crm/emails/%d/send/' % draft.id)
+
+        # A bad password is a configuration problem, not a failed send: 409 and
+        # the draft survives, because retrying is pointless until it is fixed.
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json()['code'], 'mail_not_configured')
+        self.assertIn('App Password', response.json()['detail'])
+        draft.refresh_from_db()
+        self.assertEqual(draft.status, 'draft')
 
     def test_sending_without_credentials_refuses_and_keeps_the_draft(self):
         with override_settings(EMAIL_HOST_USER='', EMAIL_HOST_PASSWORD=''):
