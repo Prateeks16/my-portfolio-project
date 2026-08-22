@@ -54,9 +54,19 @@ there. If you later use a domain that is *not* `prateeks16.in`, add it to
    | `PORTFOLIO_URL` | recommended | `https://prateeks16.in` |
    | `EXTRA_ALLOWED_ORIGINS` | optional | extra origins, comma separated |
    | `CRM_INGEST_TOKEN` | for the job scan | long random string; unset closes ingest |
-   | `EMAIL_HOST_USER` | only to send mail | Gmail address |
-   | `EMAIL_HOST_PASSWORD` | only to send mail | Gmail **App Password** |
+   | `EMAIL_HOST_USER` | for mail, both ways | Gmail address |
+   | `EMAIL_HOST_PASSWORD` | for mail, both ways | Gmail **App Password** |
    | `DEFAULT_FROM_EMAIL` | optional | defaults to `EMAIL_HOST_USER` |
+   | `DEFAULT_FROM_NAME` | recommended | display name recipients see; without it they get a bare address |
+   | `REPLY_TO_EMAIL` | optional | only if replies should go somewhere other than the sending mailbox |
+   | `IMAP_HOST` `IMAP_PORT` | optional | default `imap.gmail.com` / `993` |
+   | `IMAP_FOLDER` | optional | default `INBOX` |
+   | `IMAP_SYNC_DAYS` | optional | how far back each sync looks, default `14` |
+   | `IMAP_MAX_MESSAGES` | optional | ceiling per run, default `80` |
+
+   One Gmail App Password covers sending *and* receiving, so `EMAIL_HOST_USER`
+   and `EMAIL_HOST_PASSWORD` switch on both directions together. Environment
+   changes need a restart or redeploy to reach a running instance.
 
 3. Create your dashboard login **without a shell** — Render's shell is a paid
    feature, so `build.sh` does this for you on every deploy.
@@ -86,6 +96,12 @@ previous snapshot is kept and the build still succeeds.
 
 Optional: set `VITE_API_BASE_URL` if the backend URL ever changes. It defaults to the
 current Render URL.
+
+Every section of the portfolio is a real path — `/work`, `/about`, `/experience`,
+`/achievements`, `/contact` — rather than a `#` fragment, so they can be linked and
+indexed. They are still one page; routing happens in the browser. This depends on
+`frontend/vercel.json` rewriting every path to `index.html`. Any host you move to
+needs the same SPA fallback, or those URLs will 404 on a hard refresh.
 
 ---
 
@@ -160,17 +176,71 @@ Stack demand chart under Leads → Insights.
 
 ---
 
-## Turning on email sending
+## Turning on email, both directions
 
-Sending is deliberately off until credentials exist. Until then the CRM drafts,
-stores and edits everything, and the send endpoint refuses with an explicit message
-rather than failing silently. Nothing can leave your account by accident.
+Mail is deliberately off until credentials exist. Until then the CRM drafts, stores
+and edits everything, and both the send and sync endpoints refuse with an explicit
+message rather than failing silently. Nothing can leave your account by accident.
 
-To enable it: create a Google App Password (Google Account → Security → 2-Step
-Verification → App passwords), then set `EMAIL_HOST_USER` and `EMAIL_HOST_PASSWORD`
-on Render and redeploy. Settings in the dashboard shows live status.
+**To enable it.** Turn on 2-Step Verification (Google Account → Security), create an
+App Password under the same page, then set `EMAIL_HOST_USER` and
+`EMAIL_HOST_PASSWORD` on Render and redeploy. One password covers both directions.
+Settings in the dashboard shows live status.
+
+You do *not* need to enable IMAP in Gmail. Google removed that toggle in January 2025
+and IMAP is always on for personal accounts — if Settings → Forwarding and POP/IMAP
+shows no status line under *IMAP access*, that is what you are looking at. Leave POP
+disabled; it is not used and enabling it can disturb read state.
 
 Treat the App Password like a key — anyone holding it can send mail as you.
+
+### What each direction does
+
+**Sending** goes through Gmail's own SMTP, which is why sent mail appears in your
+Gmail **Sent** folder like anything else from that address. A third-party sender
+(SendGrid, Resend, a Firebase extension) would not — Gmail never sees those, so Sent
+stays empty. That is the reason for this design, not an accident of it.
+
+Every outgoing message is stamped with a `Message-ID` that is stored before
+transmission. Replies to it carry `In-Reply-To` and `References`, so Gmail files them
+in the existing conversation on both sides.
+
+**Receiving** pulls over IMAP into the CRM's Mail screen. Gmail stays the system of
+record: the mailbox is opened read-only and fetched with `BODY.PEEK`, so a sync
+cannot mark anything read, move it, or delete it. The read and archived flags on the
+Mail screen belong to the CRM alone — archiving there leaves the Gmail thread
+untouched.
+
+Messages are keyed on `Message-ID`, so re-syncing an overlapping window is
+idempotent. That is the recovery path after the backend has slept through a
+delivery: sync a wider window, nothing duplicates.
+
+A reply that matches something you sent stamps `replied_at` on the lead and moves it
+to *Replied* — but only from New, Contacted or Applied. An answer never drags a lead
+backwards out of Interviewing, Offer, Won or Lost.
+
+### Keeping the inbox current
+
+The Mail screen syncs itself when you open it and the last run is more than three
+minutes old, which covers ordinary use. For mail to arrive without anyone opening the
+dashboard, run the management command on a schedule:
+
+```
+python manage.py sync_mailbox            # uses IMAP_SYNC_DAYS
+python manage.py sync_mailbox --days 30  # wider window after an outage
+```
+
+Safe to run as often as you like. Overlapping windows cost a little bandwidth and
+change nothing.
+
+### When it will not connect
+
+| Message | Cause |
+|---|---|
+| `[AUTHENTICATIONFAILED] Invalid credentials` | App Password wrong, spaces not stripped, or the account password used instead |
+| `[ALERT] Please log in via your web browser` | Same — Gmail refuses account passwords over IMAP |
+| timeout, `getaddrinfo failed` | Port 993 blocked by the network |
+| `Fetched 0` | Auth is fine, the window is just quiet — widen `--days` |
 
 ---
 
@@ -210,7 +280,7 @@ Public, no auth:
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/api/profile/` `/api/projects/` `/api/experiences/` `/api/achievements/` | portfolio content |
-| POST | `/api/contact/` | contact form → CRM inbox |
+| POST | `/api/contact/` | portfolio contact form → dashboard **Inbox** (distinct from **Mail**, which is real Gmail) |
 | POST | `/api/crm/track/` | analytics beacon |
 | GET | `/api/crm/health/` | keep-warm ping |
 
@@ -223,6 +293,7 @@ Authenticated with `Authorization: Bearer <token>` from `/api/crm/auth/token/`:
 | `/api/crm/emails/` | CRUD, plus `/draft/`, `/{id}/send/`, `/mail_status/` |
 | `/api/crm/templates/` | CRUD, plus `/{id}/preview/` |
 | `/api/crm/tasks/` `/api/crm/inbox/` | CRUD; inbox has `/{id}/convert/` |
+| `/api/crm/mail/` | inbound Gmail, read-only; `/sync/`, `/sync_status/`, and per message `/{id}/reply/`, `/{id}/read/`, `/{id}/archive/`, `/{id}/convert/` |
 | `/api/crm/analytics/?days=30` | traffic rollup |
 | `/api/crm/github/` | live repo stats |
 | `/api/crm/manage/*` | write access to public content |
