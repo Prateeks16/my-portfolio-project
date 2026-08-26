@@ -54,7 +54,7 @@ const Outreach = () => {
         <div className="mb-5">
           <Note tone="warning">
             Sending is currently off. Drafts save normally, but the send button will
-            refuse until SMTP credentials are set on the backend.{' '}
+            refuse until sending credentials are set on the backend.{' '}
             <Link to="/dashboard/settings" className="font-semibold underline">
               Set them up
             </Link>

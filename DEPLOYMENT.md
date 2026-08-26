@@ -63,10 +63,15 @@ there. If you later use a domain that is *not* `prateeks16.in`, add it to
    | `IMAP_FOLDER` | optional | default `INBOX` |
    | `IMAP_SYNC_DAYS` | optional | how far back each sync looks, default `14` |
    | `IMAP_MAX_MESSAGES` | optional | ceiling per run, default `80` |
+   | `EMAIL_BACKEND` | **required on Render** | `crm.gmail_api.GmailAPIBackend` — see [Sending where SMTP is blocked](#sending-where-smtp-is-blocked) |
+   | `GMAIL_CLIENT_ID` | with that backend | OAuth client ID |
+   | `GMAIL_CLIENT_SECRET` | with that backend | OAuth client secret |
+   | `GMAIL_REFRESH_TOKEN` | with that backend | from `manage.py gmail_authorize` |
 
-   One Gmail App Password covers sending *and* receiving, so `EMAIL_HOST_USER`
-   and `EMAIL_HOST_PASSWORD` switch on both directions together. Environment
-   changes need a restart or redeploy to reach a running instance.
+   One Gmail App Password covers receiving, and sending too on any host that
+   permits outbound SMTP. **Render does not** — the four `GMAIL_*` variables are
+   what make sending work there. Environment changes need a restart or redeploy
+   to reach a running instance.
 
 3. Create your dashboard login **without a shell** — Render's shell is a paid
    feature, so `build.sh` does this for you on every deploy.
@@ -184,7 +189,9 @@ message rather than failing silently. Nothing can leave your account by accident
 
 **To enable it.** Turn on 2-Step Verification (Google Account → Security), create an
 App Password under the same page, then set `EMAIL_HOST_USER` and
-`EMAIL_HOST_PASSWORD` on Render and redeploy. One password covers both directions.
+`EMAIL_HOST_PASSWORD` on Render and redeploy. That switches on receiving, and
+switches on sending too anywhere outbound SMTP is allowed. On Render it is not, so
+sending needs the extra step in [Sending where SMTP is blocked](#sending-where-smtp-is-blocked).
 Settings in the dashboard shows live status.
 
 You do *not* need to enable IMAP in Gmail. Google removed that toggle in January 2025
@@ -196,10 +203,20 @@ Treat the App Password like a key — anyone holding it can send mail as you.
 
 ### What each direction does
 
-**Sending** goes through Gmail's own SMTP, which is why sent mail appears in your
-Gmail **Sent** folder like anything else from that address. A third-party sender
-(SendGrid, Resend, a Firebase extension) would not — Gmail never sees those, so Sent
-stays empty. That is the reason for this design, not an accident of it.
+**Sending** is performed by Gmail itself, which is why sent mail appears in your Gmail
+**Sent** folder like anything else from that address. A third-party sender (SendGrid,
+Resend, a Firebase extension) would not — Gmail never sees those, so Sent stays empty.
+That is the reason for this design, not an accident of it.
+
+There are two transports, and Gmail does the sending under both:
+
+- **SMTP** (`smtp.gmail.com`, the default) — for any host that allows outbound SMTP.
+- **The Gmail API** over HTTPS — for hosts that do not. Render is one. Same account,
+  same Sent folder, port 443 instead of 587.
+
+Which one is in use is a single environment variable and nothing above it changes:
+the same message, the same `Message-ID`, the same threading headers, the same
+behaviour on failure.
 
 Every outgoing message is stamped with a `Message-ID` that is stored before
 transmission. Replies to it carry `In-Reply-To` and `References`, so Gmail files them
@@ -229,7 +246,7 @@ not yourself.
 
 It is sent on a background thread and never raises: the submission is saved first,
 and a visitor must not see the form fail because a notification could not go out. If
-mail is unconfigured or SMTP is down, the message is still in the Inbox.
+mail is unconfigured or the transport is down, the message is still in the Inbox.
 
 The IMAP sync skips messages sent from your own address, so these notifications do
 not come back round as duplicates on the Mail screen.
@@ -248,6 +265,70 @@ python manage.py sync_mailbox --days 30  # wider window after an outage
 Safe to run as often as you like. Overlapping windows cost a little bandwidth and
 change nothing.
 
+### Sending where SMTP is blocked
+
+Render blocks outbound SMTP. This is not a guess — from the live server, on both
+587 and 465:
+
+```
+OSError: [Errno 101] Network is unreachable
+```
+
+That is `ENETUNREACH` at the socket layer: the TCP connection never opens, before
+any handshake or credential is exchanged. IMAP on 993 works from the same host, so
+it is port-specific egress filtering. **No code, credential or port setting fixes
+it.** Receiving works on Render; sending over SMTP cannot.
+
+The fix is to send over HTTPS instead, through the Gmail API. Gmail still performs
+the send, so the Sent folder still fills. Setup is once, and about fifteen minutes.
+
+**1. Google Cloud project.** At [console.cloud.google.com](https://console.cloud.google.com),
+create a project (any name). Under *APIs & Services → Library*, find **Gmail API**
+and enable it.
+
+**2. OAuth consent screen.** *APIs & Services → OAuth consent screen*. User type
+**External**. Fill in app name and your own address for both support and developer
+contact. Add the scope `https://www.googleapis.com/auth/gmail.send` — that one only;
+nothing here reads the mailbox, IMAP still does that. Add your own Gmail address as a
+**test user**.
+
+> Leaving the app in **Testing** status expires the refresh token after **7 days**,
+> and sending starts failing with `invalid_grant`. Press **Publish app** to move it
+> to *In production* and the token stops expiring. Google will show an
+> "unverified app" warning during authorization, which for a personal client on your
+> own account is expected — choose *Advanced*, then *Go to … (unsafe)*.
+
+**3. OAuth client.** *APIs & Services → Credentials → Create credentials → OAuth
+client ID*. Application type **Desktop app**. Copy the client ID and secret.
+
+**4. Mint the refresh token — locally, not on Render.** The flow needs a browser:
+
+```
+cd backend
+.venv/Scripts/python manage.py gmail_authorize --client-id XXX --client-secret YYY
+```
+
+It opens Google, waits for the redirect on `http://localhost:8765`, and prints the
+four environment variables to set. The token is printed and never written to disk —
+it can send mail as you, so treat it like the App Password. Use `--port` if 8765 is
+taken, and `--no-browser` on a headless shell.
+
+**5. Set them on Render** and redeploy:
+
+```
+EMAIL_BACKEND=crm.gmail_api.GmailAPIBackend
+GMAIL_CLIENT_ID=...
+GMAIL_CLIENT_SECRET=...
+GMAIL_REFRESH_TOKEN=...
+```
+
+Leave `EMAIL_HOST_USER` and `EMAIL_HOST_PASSWORD` exactly as they are. IMAP
+receiving still uses the App Password, and the contact-form notification still sends
+from that address.
+
+To go back to SMTP on a host that permits it, remove `EMAIL_BACKEND`. The SMTP path
+is untouched and remains the default.
+
 ### When it will not connect
 
 | Message | Cause |
@@ -256,6 +337,10 @@ change nothing.
 | `[ALERT] Please log in via your web browser` | Same — Gmail refuses account passwords over IMAP |
 | timeout, `getaddrinfo failed` | Port 993 blocked by the network |
 | `Fetched 0` | Auth is fine, the window is just quiet — widen `--days` |
+| `[Errno 101] Network is unreachable` on send | The host blocks outbound SMTP — switch `EMAIL_BACKEND` to the Gmail API |
+| `Token has been expired or revoked (invalid_grant)` | Refresh token dead. Usually the 7-day Testing-status expiry; publish the app, then re-run `gmail_authorize` |
+| `Gmail API sending is selected but not configured` | `EMAIL_BACKEND` points at the Gmail backend but a `GMAIL_*` variable is missing |
+| `Request had insufficient authentication scopes` | The client was authorized without `gmail.send` — re-run `gmail_authorize` |
 
 ---
 

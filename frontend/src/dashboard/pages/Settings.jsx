@@ -6,7 +6,7 @@ import { useApi } from '../../lib/useApi';
 import { useAuth } from '../../lib/auth';
 import { Note, Panel, PanelHeader, PageHeading } from '../components/ui';
 
-const ENV_VARS = [
+const SMTP_VARS = [
   ['EMAIL_HOST', 'smtp.gmail.com', 'SMTP server for your provider.'],
   ['EMAIL_PORT', '587', 'TLS submission port.'],
   ['EMAIL_USE_TLS', 'True', 'Leave as True for port 587.'],
@@ -19,11 +19,31 @@ const ENV_VARS = [
   ['DEFAULT_FROM_EMAIL', 'you@gmail.com', 'Optional — defaults to EMAIL_HOST_USER.'],
 ];
 
+// The host this backend runs on blocks outbound SMTP, so sending goes over the
+// Gmail API instead. Listing the SMTP variables here would be instructions that
+// cannot work however carefully they are followed.
+const GMAIL_API_VARS = [
+  [
+    'EMAIL_BACKEND',
+    'crm.gmail_api.GmailAPIBackend',
+    'Selects the Gmail API instead of SMTP. Already set if you are reading this.',
+  ],
+  ['GMAIL_CLIENT_ID', '…apps.googleusercontent.com', 'From the Google Cloud OAuth client.'],
+  ['GMAIL_CLIENT_SECRET', 'GOCSPX-…', 'From the same client.'],
+  [
+    'GMAIL_REFRESH_TOKEN',
+    '1//0g…',
+    'Printed by "python manage.py gmail_authorize", run locally once.',
+  ],
+];
+
 const Settings = () => {
   const { username } = useAuth();
   const mail = useApi('/crm/emails/mail_status/');
   const ingest = useApi('/crm/ingest-status/');
   const configured = mail.data?.configured;
+  const overApi = mail.data?.transport === 'gmail_api';
+  const envVars = overApi ? GMAIL_API_VARS : SMTP_VARS;
 
   return (
     <>
@@ -42,8 +62,9 @@ const Settings = () => {
               <div className="flex items-start gap-2.5 rounded-control border border-success/25 bg-success-bg px-3.5 py-3">
                 <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-success" />
                 <p className="text-body leading-relaxed text-success">
-                  Sending is live. SMTP credentials are set, so the Send button will
-                  transmit real email from your address.
+                  Sending is live{overApi ? ' over the Gmail API' : ' over SMTP'}, so
+                  the Send button will transmit real email from your address. Gmail
+                  performs the send either way, so it lands in your Sent folder.
                 </p>
               </div>
             ) : (
@@ -65,8 +86,15 @@ const Settings = () => {
               redeploy. They are never stored in the repository and never sent to the
               browser.
             </p>
+            {overApi && (
+              <p className="prose-measure mb-3 text-body leading-relaxed text-ink-secondary">
+                This host blocks outbound SMTP, so sending goes over the Gmail API on
+                port 443 instead. Receiving is unaffected and still uses the App
+                Password in <code>EMAIL_HOST_PASSWORD</code>, which should stay set.
+              </p>
+            )}
             <dl className="divide-y divide-line rounded-control border border-line">
-              {ENV_VARS.map(([key, example, note]) => (
+              {envVars.map(([key, example, note]) => (
                 <div key={key} className="px-3.5 py-2.5">
                   <dt className="flex flex-wrap items-baseline gap-2">
                     <code className="rounded bg-surface-sunk px-1.5 py-0.5 text-label font-semibold text-ink">
@@ -82,8 +110,9 @@ const Settings = () => {
             </dl>
             <div className="mt-3">
               <Note tone="warning">
-                Use an App Password, not your real Gmail password, and treat it like a
-                key: anyone with it can send mail as you.
+                {overApi
+                  ? 'Treat the refresh token like a key: anyone with it can send mail as you. If the Google OAuth app is still in Testing status the token expires after 7 days — publish it to production to stop that.'
+                  : 'Use an App Password, not your real Gmail password, and treat it like a key: anyone with it can send mail as you.'}
               </Note>
             </div>
           </div>

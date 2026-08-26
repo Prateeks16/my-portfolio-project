@@ -15,6 +15,7 @@ from django.db.models import Count
 from django.db.models.functions import TruncDate
 from django.utils import timezone
 
+from . import gmail_api
 from .models import Activity, Lead, OutreachEmail, PageView, TrackedEvent
 
 
@@ -22,12 +23,27 @@ logger = logging.getLogger(__name__)
 
 
 class MailNotConfigured(Exception):
-    """Raised when a send is attempted without SMTP credentials in the environment."""
+    """Raised when a send is attempted without usable credentials in the environment."""
 
 
 def mail_is_configured():
+    # Which credentials count depends on the transport. With the Gmail API
+    # selected an App Password proves nothing -- the OAuth client and refresh
+    # token are what sending needs -- and reporting "configured" on the strength
+    # of the wrong credential is how a dashboard ends up lying about itself.
+    if gmail_api.is_selected():
+        return gmail_api.is_configured()
     return bool(getattr(settings, 'EMAIL_HOST_USER', '') and
                 getattr(settings, 'EMAIL_HOST_PASSWORD', ''))
+
+
+def _not_configured_message():
+    if gmail_api.is_selected():
+        return '%s The draft has been saved.' % gmail_api.NOT_CONFIGURED
+    return (
+        'No SMTP credentials found. Set EMAIL_HOST_USER and EMAIL_HOST_PASSWORD '
+        'in the backend environment to enable sending. The draft has been saved.'
+    )
 
 
 def _html_body(text):
@@ -57,10 +73,7 @@ def send_outreach_email(email):
     it in the existing conversation instead of starting a new one.
     """
     if not mail_is_configured():
-        raise MailNotConfigured(
-            'No SMTP credentials found. Set EMAIL_HOST_USER and EMAIL_HOST_PASSWORD '
-            'in the backend environment to enable sending. The draft has been saved.'
-        )
+        raise MailNotConfigured(_not_configured_message())
 
     address = settings.DEFAULT_FROM_EMAIL or settings.EMAIL_HOST_USER
     from_name = getattr(settings, 'DEFAULT_FROM_NAME', '')
@@ -103,6 +116,18 @@ def send_outreach_email(email):
             'under this same Google account. Original error: %s'
             % (address, exc)
         ) from exc
+    except gmail_api.GmailAuthError as exc:
+        # The same class of problem as a rejected App Password, so it gets the
+        # same treatment: the draft survives and resending is pointless until
+        # the token is replaced. A refresh token dies on a Google password
+        # change, on revocation, and seven days out if the OAuth app is still
+        # in "Testing" publishing status -- that last one catches people.
+        raise MailNotConfigured(
+            'Google rejected the Gmail API credentials for %s. Re-run '
+            '"python manage.py gmail_authorize" locally and update '
+            'GMAIL_REFRESH_TOKEN in the backend environment. Original error: %s'
+            % (address, exc)
+        ) from exc
 
     email.status = 'sent'
     email.sent_at = timezone.now()
@@ -139,7 +164,10 @@ def notify_contact_submission(submission):
     if not mail_is_configured():
         return False
 
-    address = settings.EMAIL_HOST_USER
+    # The IMAP account first: this notification is meant to land in the mailbox
+    # the CRM syncs, and DEFAULT_FROM_EMAIL is only a fallback for a setup that
+    # sends through the Gmail API without an App Password configured at all.
+    address = settings.EMAIL_HOST_USER or settings.DEFAULT_FROM_EMAIL
     body = (
         'From: %s <%s>\n'
         'Subject: %s\n'

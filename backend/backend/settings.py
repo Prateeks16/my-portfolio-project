@@ -262,6 +262,24 @@ DEFAULT_FROM_NAME = os.environ.get('DEFAULT_FROM_NAME', '').strip().strip('"\'')
 REPLY_TO_EMAIL = _env_value('REPLY_TO_EMAIL')
 
 
+# --- OUTBOUND EMAIL OVER THE GMAIL API ---
+# The escape hatch for hosts that block outbound SMTP. Render does: TCP to
+# smtp.gmail.com is unreachable on both 587 and 465, at the socket layer, so no
+# combination of the settings above can work there. Setting
+#
+#     EMAIL_BACKEND=crm.gmail_api.GmailAPIBackend
+#
+# moves the same send onto HTTPS. Gmail performs it, so the message still lands
+# in the account's own Sent folder. See crm/gmail_api.py for the details, and
+# mint the refresh token with "python manage.py gmail_authorize".
+#
+# These are independent of the IMAP credentials below: receiving keeps using
+# the App Password either way.
+GMAIL_CLIENT_ID = _env_value('GMAIL_CLIENT_ID')
+GMAIL_CLIENT_SECRET = _env_value('GMAIL_CLIENT_SECRET')
+GMAIL_REFRESH_TOKEN = _env_value('GMAIL_REFRESH_TOKEN')
+
+
 # --- INBOUND EMAIL (IMAP) ---
 # The other half of the loop: replies land in Gmail, and this is how they get
 # back into the CRM. Same credentials as sending -- Gmail accepts one App

@@ -251,7 +251,7 @@ const Compose = () => {
       {mail.data?.configured === false && !locked && (
         <div className="mb-5">
           <Note tone="warning">
-            Sending is off — no SMTP credentials are set on the backend, so
+            Sending is off — no sending credentials are set on the backend, so
             <strong className="font-semibold"> Send </strong>
             will refuse and save the draft instead.{' '}
             <Link to="/dashboard/settings" className="font-semibold underline">

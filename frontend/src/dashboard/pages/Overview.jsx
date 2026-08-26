@@ -137,7 +137,7 @@ const Overview = () => {
       {summary.data && summary.data.mail_configured === false && (
         <div className="mb-5">
           <Note tone="warning">
-            Sending is off — no SMTP credentials are set on the backend. You can
+            Sending is off — no sending credentials are set on the backend. You can
             draft, store and edit everything; the send button will refuse until
             credentials exist.{' '}
             <Link to="/dashboard/settings" className="font-semibold underline">

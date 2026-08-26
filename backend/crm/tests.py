@@ -1,7 +1,12 @@
 """End-to-end check of the mail loop against an isolated test database."""
 
+import base64
 import email as email_mod
+import io
+import json
 import smtplib
+import urllib.error
+import urllib.parse
 from unittest import mock
 
 from django.contrib.auth.models import User
@@ -9,9 +14,10 @@ from django.core.mail import EmailMultiAlternatives
 from django.core import mail as django_mail
 from django.test import TestCase, override_settings
 
+from crm import gmail_api
 from crm.mailbox import _store
 from crm.models import InboundEmail, Lead, OutreachEmail
-from crm.services import send_outreach_email
+from crm.services import mail_is_configured, send_outreach_email
 
 REPLY = b"""From: Priya Mehta <priya@acme-hire.com>
 To: me@gmail.com
@@ -215,3 +221,158 @@ class MailLoopTest(TestCase):
             self.assertEqual(response.status_code, 409)
             draft.refresh_from_db()
             self.assertEqual(draft.status, 'draft')
+
+
+@override_settings(
+    EMAIL_BACKEND=gmail_api.BACKEND_PATH,
+    GMAIL_CLIENT_ID='client-id',
+    GMAIL_CLIENT_SECRET='client-secret',
+    GMAIL_REFRESH_TOKEN='refresh-token',
+    EMAIL_HOST_USER='me@gmail.com',
+    EMAIL_HOST_PASSWORD='app-password',
+    DEFAULT_FROM_EMAIL='me@gmail.com',
+    DEFAULT_FROM_NAME='Prateek Sahu',
+)
+class GmailAPITransportTest(TestCase):
+    """The HTTPS send path, exercised through the same public entry point.
+
+    `_post` is the only place this code touches the network, so it is the only
+    thing stubbed. Everything above it -- the backend, get_connection(),
+    send_outreach_email -- runs for real, which is the point: the claim being
+    tested is that swapping the transport changes nothing else.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user('me', password='pw')
+        self.client.force_login(self.user)
+        # Module-level cache. Left alone it would leak an access token minted
+        # by one test into the request counts of the next.
+        gmail_api.reset_token_cache()
+        self.addCleanup(gmail_api.reset_token_cache)
+        self.calls = []
+
+    def _fake_post(self, url, payload, headers=None, form=False):
+        self.calls.append((url, payload, headers))
+        if url == gmail_api.TOKEN_URL:
+            return {'access_token': 'access-token', 'expires_in': 3600}
+        return {'id': 'gmail-msg-1', 'threadId': 'gmail-thread-1'}
+
+    def _sent_mime(self):
+        raw = [p for url, p, _ in self.calls if url == gmail_api.SEND_URL][0]['raw']
+        return base64.urlsafe_b64decode(raw).decode('utf-8')
+
+    def test_send_carries_the_same_headers_as_the_smtp_path(self):
+        lead = Lead.objects.create(
+            name='Priya Mehta', email='priya@acme-hire.com', stage='new',
+        )
+        outreach = OutreachEmail.objects.create(
+            lead=lead, to_email=lead.email, to_name='Priya Mehta',
+            subject='Backend role', body='Hi Priya,\n\nQuick note.',
+            in_reply_to='<earlier@acme-hire.com>',
+        )
+        with mock.patch.object(gmail_api, '_post', side_effect=self._fake_post):
+            send_outreach_email(outreach)
+
+        outreach.refresh_from_db()
+        mime = self._sent_mime()
+
+        # The contract the reply matching depends on: the Message-ID that went
+        # out is the one stored, and the thread references survive the trip
+        # through base64.
+        self.assertTrue(outreach.message_id.startswith('<'))
+        self.assertIn('Message-ID: %s' % outreach.message_id, mime)
+        self.assertIn('In-Reply-To: <earlier@acme-hire.com>', mime)
+        self.assertIn('References: <earlier@acme-hire.com>', mime)
+        self.assertIn('Prateek Sahu <me@gmail.com>', mime)
+        self.assertIn('Priya Mehta <priya@acme-hire.com>', mime)
+
+        self.assertEqual(outreach.status, 'sent')
+        lead.refresh_from_db()
+        self.assertEqual(lead.stage, 'contacted')
+
+        # Bearer token on the send, and it came from the refresh exchange.
+        send_call = [c for c in self.calls if c[0] == gmail_api.SEND_URL][0]
+        self.assertEqual(send_call[2]['Authorization'], 'Bearer access-token')
+
+    def test_the_access_token_is_minted_once_and_reused(self):
+        drafts = [
+            OutreachEmail.objects.create(to_email='a@b.com', subject='s', body='b'),
+            OutreachEmail.objects.create(to_email='c@d.com', subject='s', body='b'),
+        ]
+        with mock.patch.object(gmail_api, '_post', side_effect=self._fake_post):
+            for draft in drafts:
+                send_outreach_email(draft)
+
+        token_calls = [c for c in self.calls if c[0] == gmail_api.TOKEN_URL]
+        send_calls = [c for c in self.calls if c[0] == gmail_api.SEND_URL]
+        self.assertEqual(len(token_calls), 1)
+        self.assertEqual(len(send_calls), 2)
+
+    def test_a_dead_refresh_token_keeps_the_draft_and_says_what_to_do(self):
+        draft = OutreachEmail.objects.create(
+            to_email='x@y.com', subject='s', body='b',
+        )
+        failure = gmail_api.GmailAuthError('Token has been expired or revoked. (invalid_grant)')
+        with mock.patch.object(gmail_api, '_post', side_effect=failure):
+            response = self.client.post('/api/crm/emails/%d/send/' % draft.id)
+
+        # Same handling as a rejected App Password: a configuration problem, so
+        # 409 and an intact draft rather than a failed send worth retrying.
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json()['code'], 'mail_not_configured')
+        self.assertIn('gmail_authorize', response.json()['detail'])
+        draft.refresh_from_db()
+        self.assertEqual(draft.status, 'draft')
+
+    def test_an_app_password_does_not_count_as_gmail_api_credentials(self):
+        # EMAIL_HOST_PASSWORD is still set here, because IMAP needs it. It must
+        # not make the dashboard claim sending is live.
+        with override_settings(GMAIL_REFRESH_TOKEN=''):
+            self.assertFalse(mail_is_configured())
+            response = self.client.get('/api/crm/emails/mail_status/')
+            self.assertFalse(response.json()['configured'])
+
+    def test_a_refused_send_is_reported_as_a_send_failure_not_a_config_error(self):
+        draft = OutreachEmail.objects.create(
+            to_email='x@y.com', subject='s', body='b',
+        )
+        failure = gmail_api.GmailAPIError('Gmail API returned 500: Backend Error')
+        with mock.patch.object(gmail_api, '_post', side_effect=failure):
+            response = self.client.post('/api/crm/emails/%d/send/' % draft.id)
+
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(response.json()['code'], 'send_failed')
+        draft.refresh_from_db()
+        self.assertEqual(draft.status, 'failed')
+
+    def test_an_http_error_body_becomes_the_message_instead_of_the_status_line(self):
+        # The reason this module reads error bodies at all: urllib's own string
+        # for a 400 is "HTTP Error 400: Bad Request", which names nothing.
+        body = json.dumps({
+            'error': 'invalid_grant',
+            'error_description': 'Token has been expired or revoked.',
+        }).encode('utf-8')
+        failure = urllib.error.HTTPError(
+            gmail_api.TOKEN_URL, 400, 'Bad Request', {}, io.BytesIO(body)
+        )
+        with mock.patch.object(
+            gmail_api.urllib.request, 'urlopen', side_effect=failure
+        ):
+            with self.assertRaises(gmail_api.GmailAuthError) as caught:
+                gmail_api.access_token()
+
+        self.assertIn('Token has been expired or revoked.', str(caught.exception))
+
+    def test_the_consent_url_asks_for_offline_access_every_time(self):
+        query = urllib.parse.parse_qs(urllib.parse.urlparse(
+            gmail_api.authorization_url('client-id', 'http://localhost:8765')
+        ).query)
+
+        # Drop either of these and authorization still appears to succeed, while
+        # handing back no refresh token at all -- which is indistinguishable
+        # from a bug in the exchange until you read Google's docs closely.
+        self.assertEqual(query['access_type'], ['offline'])
+        self.assertEqual(query['prompt'], ['consent'])
+        # Sending only. Widening this scope would make the refresh token able to
+        # read the mailbox, which it has no reason to do.
+        self.assertEqual(query['scope'], ['https://www.googleapis.com/auth/gmail.send'])

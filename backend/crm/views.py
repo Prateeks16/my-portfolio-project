@@ -17,6 +17,7 @@ from api.serializers import (
     SkillSerializer,
 )
 
+from . import gmail_api
 from .mailbox import MailboxNotConfigured, mailbox_is_configured, sync_mailbox
 from .models import (
     Activity,
@@ -281,10 +282,16 @@ class OutreachEmailViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def mail_status(self, request):
-        """Lets the UI tell the user whether sending is live or draft-only."""
+        """Lets the UI tell the user whether sending is live or draft-only.
+
+        `transport` is here because the instructions differ: on a host that
+        blocks SMTP, telling someone to set EMAIL_HOST_PASSWORD is advice that
+        cannot work no matter how carefully they follow it.
+        """
         return Response({
             'configured': mail_is_configured(),
             'receiving': mailbox_is_configured(),
+            'transport': 'gmail_api' if gmail_api.is_selected() else 'smtp',
         })
 
 
