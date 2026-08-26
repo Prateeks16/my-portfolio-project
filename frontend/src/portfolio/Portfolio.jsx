@@ -469,8 +469,21 @@ const Footer = ({ profile }) => (
     <div className="mx-auto max-w-6xl">
       <div className="bezel">
         <div className="bezel-core flex flex-wrap items-center justify-between gap-4 px-6 py-5 md:px-8">
-          <p className="text-sm text-ink-tertiary">
-            © {new Date().getFullYear()} {profile?.full_name || 'Prateek Sahu'}
+          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-tertiary">
+            <span>
+              © {new Date().getFullYear()} {profile?.full_name || 'Prateek Sahu'}
+            </span>
+            {/*
+              Linked rather than left as a bare URL: an orphan page is one
+              nobody can find, and Google checks that the policy it was given is
+              actually reachable from the site.
+            */}
+            <Link
+              to="/privacy"
+              className="transition-colors duration-500 ease-fluid hover:text-ink"
+            >
+              Privacy
+            </Link>
           </p>
           <div className="flex items-center gap-1">
             <a

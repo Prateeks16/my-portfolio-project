@@ -12,6 +12,10 @@ import Portfolio from './portfolio/Portfolio';
  * Everything behind the login — including the charting library — is split out
  * and only fetched once someone actually opens the dashboard.
  */
+// Rarely visited, and required to exist at a stable address rather than to load
+// fast, so it is split out of the portfolio bundle like the dashboard is.
+const Privacy = lazy(() => import('./portfolio/Privacy'));
+
 const DashboardLayout = lazy(() => import('./dashboard/DashboardLayout'));
 const Login = lazy(() => import('./dashboard/Login'));
 const Overview = lazy(() => import('./dashboard/pages/Overview'));
@@ -59,6 +63,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
               security boundary — the login is the boundary, and this only skips
               the part where you remember the real path.
             */}
+            <Route path="/privacy" element={<Privacy />} />
+
             <Route path="/shell" element={<Navigate to="/dashboard" replace />} />
 
             <Route path="/dashboard/login" element={<Login />} />
