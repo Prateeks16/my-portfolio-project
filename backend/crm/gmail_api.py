@@ -288,9 +288,26 @@ def flatten(mime):
     return buffer.getvalue()
 
 
+# users.messages.send takes the whole message as base64 inside a JSON body, and
+# that request is capped at 5 MB. Base64 costs a third on top, so the usable
+# message is about 3.75 MB -- well under Gmail's own 25 MB limit, which needs
+# the separate upload endpoint to reach. Worth knowing before blaming Gmail for
+# rejecting an attachment it would otherwise have accepted.
+MAX_REQUEST_BYTES = 5 * 1024 * 1024
+
+
 def send_raw(mime_bytes):
     """Hand one RFC 5322 message to users.messages.send."""
-    payload = {'raw': base64.urlsafe_b64encode(mime_bytes).decode('ascii')}
+    encoded = base64.urlsafe_b64encode(mime_bytes)
+    if len(encoded) > MAX_REQUEST_BYTES:
+        raise GmailAPIError(
+            'The message is %.1f MB once encoded, over the %d MB the Gmail API '
+            'accepts in a single send. Attachments are the usual cause -- the '
+            'practical ceiling is about %.1f MB of files.'
+            % (len(encoded) / 1048576.0, MAX_REQUEST_BYTES // 1048576,
+               MAX_REQUEST_BYTES * 0.75 / 1048576.0)
+        )
+    payload = {'raw': encoded.decode('ascii')}
     try:
         return _post(
             SEND_URL, payload,

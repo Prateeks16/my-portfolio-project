@@ -2,6 +2,7 @@ from rest_framework import serializers
 
 from .models import (
     Activity,
+    EmailAttachment,
     EmailTemplate,
     InboundEmail,
     Lead,
@@ -46,9 +47,25 @@ class EmailTemplateSerializer(serializers.ModelSerializer):
         read_only_fields = ['created_at', 'updated_at', 'times_used']
 
 
+class EmailAttachmentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EmailAttachment
+        fields = ['id', 'filename', 'content_type', 'size', 'created_at']
+        # Everything here is derived from the uploaded file by the attach
+        # endpoint. A client that could set `size` could lie about it, and the
+        # send-size check is what that number exists for.
+        read_only_fields = fields
+
+
 class OutreachEmailSerializer(serializers.ModelSerializer):
     lead_name = serializers.CharField(source='lead.name', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
+    attachments = EmailAttachmentSerializer(many=True, read_only=True)
+    # Which resume `attach_resume` will actually send, resolved server-side so
+    # the compose screen and the send agree on one answer.
+    resume_variant = serializers.CharField(
+        source='lead.resume_for_role', read_only=True, default='backend'
+    )
 
     class Meta:
         model = OutreachEmail

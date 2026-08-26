@@ -1,9 +1,11 @@
 import logging
+import os
 
 from django.conf import settings
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
@@ -21,6 +23,7 @@ from . import gmail_api
 from .mailbox import MailboxNotConfigured, mailbox_is_configured, sync_mailbox
 from .models import (
     Activity,
+    EmailAttachment,
     EmailTemplate,
     InboundEmail,
     Lead,
@@ -32,6 +35,7 @@ from .models import (
 )
 from .serializers import (
     ActivitySerializer,
+    EmailAttachmentSerializer,
     EmailTemplateSerializer,
     InboundEmailListSerializer,
     InboundEmailSerializer,
@@ -43,6 +47,7 @@ from .serializers import (
     TrackSerializer,
 )
 from .services import (
+    AttachmentUnavailable,
     MailNotConfigured,
     analytics_overview,
     github_stats,
@@ -266,6 +271,14 @@ class OutreachEmailViewSet(viewsets.ModelViewSet):
                 {'detail': str(exc), 'code': 'mail_not_configured'},
                 status=status.HTTP_409_CONFLICT,
             )
+        except AttachmentUnavailable as exc:
+            # Nothing was transmitted -- the files are gathered before the send
+            # precisely so this can happen with the draft still intact. Not
+            # marked failed, because re-uploading the file makes it sendable.
+            return Response(
+                {'detail': str(exc), 'code': 'attachment_unavailable'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         except Exception as exc:  # network, auth, malformed address
             # str() on an SMTP exception is often just a status tuple, which
             # says nothing in a log. The traceback is what identifies whether
@@ -279,6 +292,62 @@ class OutreachEmailViewSet(viewsets.ModelViewSet):
             return Response({'detail': detail, 'code': 'send_failed'},
                             status=status.HTTP_502_BAD_GATEWAY)
         return Response(OutreachEmailSerializer(email).data)
+
+    @action(detail=True, methods=['post'], parser_classes=[MultiPartParser, FormParser])
+    def attach(self, request, pk=None):
+        """Upload one file to go out with this draft.
+
+        Refuses once the email is sent: attaching to something already
+        delivered would show a file in the CRM that no recipient ever got.
+        """
+        email = self.get_object()
+        if email.status == 'sent':
+            return Response({'detail': 'This email was already sent.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        upload = request.FILES.get('file')
+        if not upload:
+            return Response({'detail': 'No file was uploaded.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        # Checked here as well as at send time. Rejecting a 10 MB file the
+        # moment it is picked is kinder than accepting it and failing at the
+        # end, once the message has been written.
+        already = sum(a.size for a in email.attachments.all())
+        if (already + upload.size) * 4 / 3 > gmail_api.MAX_REQUEST_BYTES:
+            return Response(
+                {'detail': 'That would put this email over the %d MB the Gmail '
+                           'API accepts. Attachments so far: %.1f MB.'
+                           % (gmail_api.MAX_REQUEST_BYTES // 1048576,
+                              already / 1048576.0),
+                 'code': 'too_large'},
+                status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            )
+
+        attachment = EmailAttachment.objects.create(
+            email=email,
+            file=upload,
+            # basename only: browsers on some platforms send a path, and it has
+            # no business becoming part of the stored name.
+            filename=os.path.basename(upload.name)[:255],
+            content_type=getattr(upload, 'content_type', '') or '',
+            size=upload.size,
+        )
+        return Response(EmailAttachmentSerializer(attachment).data,
+                        status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['delete'],
+            url_path='attachments/(?P<attachment_id>[0-9]+)')
+    def remove_attachment(self, request, pk=None, attachment_id=None):
+        email = self.get_object()
+        if email.status == 'sent':
+            return Response({'detail': 'This email was already sent.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        deleted, _ = email.attachments.filter(pk=attachment_id).delete()
+        if not deleted:
+            return Response({'detail': 'No such attachment.'},
+                            status=status.HTTP_404_NOT_FOUND)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=False, methods=['get'])
     def mail_status(self, request):

@@ -196,3 +196,16 @@ export const silenceDays = (lead) => {
 };
 
 export const cx = (...parts) => parts.filter(Boolean).join(' ');
+
+/**
+ * Bytes as something a person reads at a glance.
+ *
+ * Kept at one decimal from MB up: "1.4 MB" is useful when the send ceiling is
+ * around 3.7 MB, where "1 MB" would not be.
+ */
+export const formatBytes = (bytes) => {
+  const size = Number(bytes) || 0;
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+};

@@ -84,8 +84,23 @@ class Profile(models.Model):
     linkedin_url = models.URLField(blank=True)
 
     #files
+    # The public resume, offered for download on the portfolio, and the default
+    # the CRM attaches. Deliberately the backend/SDE one: it is the broader
+    # document, so it is the safer thing to send when nothing says otherwise.
     resume_pdf = models.FileField(upload_to='resumes/', blank=True, null=True)
+    # The AI/ML positioning of the same history. crm.suggest_resume decides which
+    # of the two a lead's role calls for; without this field that decision had
+    # nothing to choose between and the dashboard was naming a file that did not
+    # exist. Optional -- unset simply falls back to resume_pdf.
+    resume_pdf_ai_ml = models.FileField(upload_to='resumes/', blank=True, null=True)
     profile_picture = models.ImageField(upload_to='profile_pictures/', blank=True, null=True)
+
+    def resume_for_variant(self, variant):
+        """The resume file for a variant key, falling back to the public one."""
+        if variant == 'ai_ml' and self.resume_pdf_ai_ml:
+            return self.resume_pdf_ai_ml
+        return self.resume_pdf
+
     class Meta:
         verbose_name_plural = "Profile"
 

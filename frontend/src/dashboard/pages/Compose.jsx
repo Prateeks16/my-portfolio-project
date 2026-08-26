@@ -1,9 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, Eye, Save, Send, Trash2, Wand2 } from 'lucide-react';
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Eye,
+  Paperclip,
+  Save,
+  Send,
+  Trash2,
+  Wand2,
+  X,
+} from 'lucide-react';
 import api from '../../api';
 import { apiError, useApi } from '../../lib/useApi';
-import { relativeTime } from '../../lib/format';
+import { formatBytes, relativeTime } from '../../lib/format';
 import {
   Badge,
   Button,
@@ -38,7 +48,12 @@ const Compose = () => {
     to_name: '',
     subject: '',
     body: '',
+    // On by default: the templates say "attached" in the body, so not sending
+    // it is the exception that needs a deliberate click.
+    attach_resume: true,
   });
+  const [attachments, setAttachments] = useState([]);
+  const [uploading, setUploading] = useState(false);
   const [status, setStatus] = useState('draft');
   const [sentAt, setSentAt] = useState(null);
   const [savedId, setSavedId] = useState(emailId || null);
@@ -68,7 +83,9 @@ const Compose = () => {
         to_name: existing.data.to_name || '',
         subject: existing.data.subject || '',
         body: existing.data.body || '',
+        attach_resume: existing.data.attach_resume !== false,
       });
+      setAttachments(existing.data.attachments || []);
       setStatus(existing.data.status);
       setSentAt(existing.data.sent_at);
       setSavedId(existing.data.id);
@@ -165,6 +182,7 @@ const Compose = () => {
       to_name: form.to_name,
       subject: form.subject,
       body: form.body,
+      attach_resume: form.attach_resume,
       status: 'draft',
     };
     try {
@@ -200,13 +218,58 @@ const Compose = () => {
       setFlash(`Sent to ${data.to_email}.`);
     } catch (caught) {
       const code = caught?.response?.data?.code;
+      // Both of these already carry a message that says what to do about it;
+      // prefixing "Could not send" would only bury it.
       setError(
-        code === 'mail_not_configured'
+        code === 'mail_not_configured' || code === 'attachment_unavailable'
           ? caught.response.data.detail
           : `Could not send: ${apiError(caught)}`
       );
     } finally {
       setBusy(null);
+    }
+  };
+
+  /**
+   * Files hang off a saved draft, so an unsaved compose is saved first.
+   *
+   * Uploaded one at a time rather than in one request: the server checks the
+   * running total against the send ceiling, so the third file can be refused
+   * while the first two are already safely attached.
+   */
+  const addFiles = async (event) => {
+    const files = Array.from(event.target.files || []);
+    // Cleared immediately so picking the same file twice still fires onChange.
+    event.target.value = '';
+    if (!files.length) return;
+
+    const id = await saveDraft();
+    if (!id) return;
+
+    setUploading(true);
+    setError(null);
+    try {
+      for (const file of files) {
+        const body = new FormData();
+        body.append('file', file);
+        const { data } = await api.post(`/crm/emails/${id}/attach/`, body);
+        setAttachments((current) => [...current, data]);
+      }
+      setFlash(files.length > 1 ? `${files.length} files attached.` : 'File attached.');
+    } catch (caught) {
+      setError(caught?.response?.data?.detail || apiError(caught));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removeAttachment = async (attachmentId) => {
+    setError(null);
+    try {
+      await api.delete(`/crm/emails/${savedId}/attachments/${attachmentId}/`);
+      setAttachments((current) => current.filter((row) => row.id !== attachmentId));
+    } catch (caught) {
+      setError(apiError(caught));
     }
   };
 
@@ -339,6 +402,97 @@ const Compose = () => {
                 className="font-[inherit] text-body"
               />
             </Field>
+          </div>
+
+          <div className="border-t border-line px-4 py-3.5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h3 className="text-label font-semibold text-ink">Attachments</h3>
+              {!locked && (
+                <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-control border border-line px-3 py-1.5 text-label font-medium text-ink-secondary transition-colors hover:border-line-strong hover:text-ink">
+                  <Paperclip size={14} />
+                  {uploading ? 'Uploading…' : 'Add files'}
+                  <input
+                    type="file"
+                    multiple
+                    className="sr-only"
+                    disabled={uploading}
+                    onChange={addFiles}
+                  />
+                </label>
+              )}
+            </div>
+
+            {/*
+              The resume is not an uploaded file -- it is picked automatically
+              from the lead's role. Shown alongside the others because from the
+              recipient's side there is no difference, and a row that says what
+              will be sent is the point.
+            */}
+            <label className="mt-3 flex items-start gap-2.5 rounded-control border border-line px-3.5 py-2.5">
+              <input
+                type="checkbox"
+                disabled={locked}
+                checked={form.attach_resume}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    attach_resume: event.target.checked,
+                  }))
+                }
+                className="mt-0.5 h-4 w-4 shrink-0 accent-ink"
+              />
+              <span className="text-body text-ink-secondary">
+                Attach my résumé —{' '}
+                <strong className="font-semibold text-ink">
+                  {selectedLead?.resume_for_role === 'ai_ml'
+                    ? 'AI / ML variant'
+                    : 'Backend / SDE variant'}
+                </strong>
+                {selectedLead ? (
+                  <span className="text-ink-tertiary">
+                    {' '}
+                    · chosen from {selectedLead.role || 'the role'}
+                  </span>
+                ) : (
+                  <span className="text-ink-tertiary"> · default without a lead</span>
+                )}
+              </span>
+            </label>
+
+            {attachments.length > 0 && (
+              <ul className="mt-2 divide-y divide-line rounded-control border border-line">
+                {attachments.map((file) => (
+                  <li
+                    key={file.id}
+                    className="flex items-center justify-between gap-3 px-3.5 py-2.5"
+                  >
+                    <span className="min-w-0 flex-1 truncate text-body text-ink">
+                      {file.filename}
+                    </span>
+                    <span className="shrink-0 text-label text-ink-tertiary">
+                      {formatBytes(file.size)}
+                    </span>
+                    {!locked && (
+                      <button
+                        type="button"
+                        onClick={() => removeAttachment(file.id)}
+                        aria-label={`Remove ${file.filename}`}
+                        className="shrink-0 rounded p-1 text-ink-tertiary transition-colors hover:text-danger"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {attachments.length > 0 && (
+              <p className="mt-2 text-label text-ink-tertiary">
+                {formatBytes(attachments.reduce((total, file) => total + file.size, 0))}{' '}
+                attached. Gmail accepts about 3.7 MB per message through the API.
+              </p>
+            )}
           </div>
 
           {!locked && (

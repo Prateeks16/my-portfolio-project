@@ -16,6 +16,8 @@ from django.db.models.functions import TruncDate
 from django.utils import timezone
 
 from . import gmail_api
+from api.models import Profile
+
 from .models import Activity, Lead, OutreachEmail, PageView, TrackedEvent
 
 
@@ -58,6 +60,70 @@ def _html_body(text):
         'Helvetica,Arial,sans-serif;font-size:15px;line-height:1.65;'
         'color:#1a1a1a">%s</div>' % escaped.replace('\n', '<br/>')
     )
+
+
+class AttachmentUnavailable(Exception):
+    """A file that should have gone out could not be read."""
+
+
+def _read_stored_file(field):
+    """Pull the bytes of a stored file, wherever the storage backend keeps them.
+
+    Media lives on Cloudinary, so this is a network round trip, not a disk read,
+    and it can fail on its own schedule.
+    """
+    try:
+        field.open('rb')
+        try:
+            return field.read()
+        finally:
+            field.close()
+    except Exception as exc:
+        raise AttachmentUnavailable(str(exc)) from exc
+
+
+def _collect_attachments(email):
+    """Every file this email should carry, as (filename, bytes, mimetype).
+
+    Raises rather than skipping. A message whose body says "my resume is
+    attached" and which arrives with nothing attached is worse than one that
+    was not sent: the recipient reads carelessness, and nothing in the CRM
+    would show that anything went wrong.
+    """
+    files = []
+
+    for attachment in email.attachments.all():
+        try:
+            content = _read_stored_file(attachment.file)
+        except AttachmentUnavailable as exc:
+            raise AttachmentUnavailable(
+                'Could not read the attachment "%s": %s' % (attachment.filename, exc)
+            ) from exc
+        files.append((
+            attachment.filename,
+            content,
+            attachment.content_type or 'application/octet-stream',
+        ))
+
+    if email.attach_resume:
+        variant = email.lead.resume_for_role if email.lead else 'backend'
+        profile = Profile.objects.first()
+        resume = profile.resume_for_variant(variant) if profile else None
+        if resume:
+            try:
+                content = _read_stored_file(resume)
+            except AttachmentUnavailable as exc:
+                raise AttachmentUnavailable(
+                    'Could not read the %s resume: %s' % (variant, exc)
+                ) from exc
+            # Named for the reader, not for the storage bucket. "resume.pdf" in
+            # a downloads folder is anonymous; a name is not.
+            label = (profile.full_name or 'Resume').replace(' ', '-')
+            files.append((
+                '%s-Resume.pdf' % label, content, 'application/pdf',
+            ))
+
+    return files
 
 
 def send_outreach_email(email):
@@ -105,6 +171,10 @@ def send_outreach_email(email):
         reply_to=[reply_to] if reply_to else None,
     )
     message.attach_alternative(_html_body(email.body), 'text/html')
+    # Before the send, so an unreadable file leaves the draft intact rather than
+    # producing a half-sent message that cannot be recalled.
+    for filename, content, mimetype in _collect_attachments(email):
+        message.attach(filename, content, mimetype)
     try:
         message.send(fail_silently=False)
     except smtplib.SMTPAuthenticationError as exc:

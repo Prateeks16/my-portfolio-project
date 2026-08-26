@@ -10,11 +10,13 @@ import urllib.parse
 from unittest import mock
 
 from django.contrib.auth.models import User
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.mail import EmailMultiAlternatives
 from django.core import mail as django_mail
 from django.test import TestCase, override_settings
 
-from crm import gmail_api
+from api.models import Profile
+from crm import gmail_api, services
 from crm.mailbox import _store
 from crm.models import InboundEmail, Lead, OutreachEmail
 from crm.services import mail_is_configured, send_outreach_email
@@ -275,10 +277,13 @@ class GmailAPITransportTest(TestCase):
         return [c for c in self.calls
                 if c[0] == url and (method is None or c[1] == method)]
 
-    def _sent_mime(self):
+    def _sent_mime_raw(self):
         return base64.urlsafe_b64decode(
             self._calls_to(gmail_api.SEND_URL)[0][2]['raw']
-        ).decode('utf-8')
+        ).decode('utf-8', 'replace')
+
+    def _sent_mime(self):
+        return self._sent_mime_raw()
 
     def test_send_carries_the_same_headers_as_the_smtp_path(self):
         lead = Lead.objects.create(
@@ -448,6 +453,153 @@ class GmailAPITransportTest(TestCase):
                 gmail_api.access_token()
 
         self.assertIn('Token has been expired or revoked.', str(caught.exception))
+
+    def _attached(self):
+        """(filename, mimetype) for every part the sent message carries."""
+        return [(name, mimetype) for name, mimetype, _ in self._attached_parts()]
+
+    def _attached_parts(self):
+        """(filename, mimetype, decoded bytes) per attachment.
+
+        Decoded, because MIME base64-encodes the part -- searching the raw
+        message for the file's bytes finds nothing even when the attachment is
+        perfectly correct.
+        """
+        parsed = email_mod.message_from_string(self._sent_mime())
+        return [
+            (part.get_filename(), part.get_content_type(),
+             part.get_payload(decode=True))
+            for part in parsed.walk()
+            if part.get_filename()
+        ]
+
+    def test_the_resume_variant_the_lead_calls_for_goes_out_with_it(self):
+        Profile.objects.create(
+            full_name='Prateek Sahu', tagline='t', bio='b', email='me@gmail.com',
+            resume_pdf=SimpleUploadedFile('backend.pdf', b'%PDF-backend'),
+            resume_pdf_ai_ml=SimpleUploadedFile('ai.pdf', b'%PDF-ai-ml'),
+        )
+        # An ML role, so suggest_resume picks the AI/ML variant without anyone
+        # setting it by hand. That inference existed already; nothing consumed it.
+        lead = Lead.objects.create(
+            name='Priya Mehta', email='priya@acme-hire.com',
+            role='Machine Learning Engineer',
+        )
+        self.assertEqual(lead.resume_for_role, 'ai_ml')
+
+        outreach = OutreachEmail.objects.create(
+            lead=lead, to_email=lead.email, subject='ML role', body='...',
+        )
+        with self._patch():
+            send_outreach_email(outreach)
+
+        # The AI/ML file, not the backend one -- the whole point of the variant.
+        self.assertEqual(
+            self._attached_parts(),
+            [('Prateek-Sahu-Resume.pdf', 'application/pdf', b'%PDF-ai-ml')],
+        )
+
+    def test_turning_the_resume_off_sends_nothing_extra(self):
+        Profile.objects.create(
+            full_name='Prateek Sahu', tagline='t', bio='b', email='me@gmail.com',
+            resume_pdf=SimpleUploadedFile('backend.pdf', b'%PDF-backend'),
+        )
+        outreach = OutreachEmail.objects.create(
+            to_email='x@y.com', subject='s', body='b', attach_resume=False,
+        )
+        with self._patch():
+            send_outreach_email(outreach)
+        self.assertEqual(self._attached(), [])
+
+    def test_uploaded_files_go_out_under_the_name_that_was_picked(self):
+        outreach = OutreachEmail.objects.create(
+            to_email='x@y.com', subject='s', body='b', attach_resume=False,
+        )
+        response = self.client.post(
+            '/api/crm/emails/%d/attach/' % outreach.id,
+            {'file': SimpleUploadedFile(
+                'Case Study.pdf', b'%PDF-case', content_type='application/pdf')},
+        )
+        self.assertEqual(response.status_code, 201, response.content)
+        self.assertEqual(response.json()['filename'], 'Case Study.pdf')
+
+        with self._patch():
+            send_outreach_email(outreach)
+
+        # Storage mangles the stored name for uniqueness; the recipient must
+        # still see the name that was chosen.
+        self.assertEqual(
+            self._attached(), [('Case Study.pdf', 'application/pdf')]
+        )
+
+    def test_an_attachment_can_be_removed_before_sending(self):
+        outreach = OutreachEmail.objects.create(
+            to_email='x@y.com', subject='s', body='b', attach_resume=False,
+        )
+        created = self.client.post(
+            '/api/crm/emails/%d/attach/' % outreach.id,
+            {'file': SimpleUploadedFile('a.txt', b'hello')},
+        ).json()
+
+        response = self.client.delete(
+            '/api/crm/emails/%d/attachments/%d/' % (outreach.id, created['id'])
+        )
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(outreach.attachments.count(), 0)
+
+    def test_a_file_that_cannot_be_read_stops_the_send_and_keeps_the_draft(self):
+        outreach = OutreachEmail.objects.create(
+            to_email='x@y.com', subject='s', body='b', attach_resume=False,
+        )
+        self.client.post(
+            '/api/crm/emails/%d/attach/' % outreach.id,
+            {'file': SimpleUploadedFile('a.txt', b'hello')},
+        )
+
+        with mock.patch.object(
+            services, '_read_stored_file',
+            side_effect=services.AttachmentUnavailable('storage timeout'),
+        ):
+            response = self.client.post('/api/crm/emails/%d/send/' % outreach.id)
+
+        # A message whose body promises an attachment must not go out without
+        # it. Files are gathered before the send so this is still recoverable:
+        # 400, draft intact, not marked failed, because re-uploading fixes it.
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()['code'], 'attachment_unavailable')
+        self.assertEqual(self._calls_to(gmail_api.SEND_URL), [])
+        outreach.refresh_from_db()
+        self.assertEqual(outreach.status, 'draft')
+
+    def test_a_message_over_the_api_ceiling_is_refused_with_its_size(self):
+        outreach = OutreachEmail.objects.create(
+            to_email='x@y.com', subject='s', body='b', attach_resume=False,
+        )
+        # Smaller than the bare message, so the guard trips without needing a
+        # multi-megabyte fixture in the test suite.
+        with mock.patch.object(gmail_api, 'MAX_REQUEST_BYTES', 64):
+            with self._patch():
+                with self.assertRaises(gmail_api.GmailAPIError) as caught:
+                    send_outreach_email(outreach)
+
+        # Checked before the request rather than left to Gmail, so the message
+        # names attachments as the cause instead of returning a bare 400.
+        self.assertIn('over the', str(caught.exception))
+        self.assertEqual(self._calls_to(gmail_api.SEND_URL), [])
+
+    def test_the_upload_endpoint_refuses_a_file_that_blows_the_ceiling(self):
+        outreach = OutreachEmail.objects.create(
+            to_email='x@y.com', subject='s', body='b',
+        )
+        with mock.patch.object(gmail_api, 'MAX_REQUEST_BYTES', 2048):
+            response = self.client.post(
+                '/api/crm/emails/%d/attach/' % outreach.id,
+                {'file': SimpleUploadedFile('big.bin', b'x' * 4096)},
+            )
+        # Rejected when it is picked, not after the message has been written.
+        self.assertEqual(response.status_code, 413)
+        self.assertEqual(response.json()['code'], 'too_large')
+        self.assertEqual(outreach.attachments.count(), 0)
 
     def test_the_consent_url_asks_for_offline_access_every_time(self):
         query = urllib.parse.parse_qs(urllib.parse.urlparse(

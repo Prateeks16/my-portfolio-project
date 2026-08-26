@@ -1,5 +1,11 @@
+from django.core.files.storage import storages
 from django.db import models
 from django.utils import timezone
+
+
+def _attachment_storage():
+    """Named storage rather than a hardcoded backend, so tests can use memory."""
+    return storages['attachments']
 
 
 RESUME_VARIANTS = [
@@ -195,6 +201,11 @@ class OutreachEmail(models.Model):
     subject = models.CharField(max_length=300)
     body = models.TextField()
 
+    # Whether to attach the resume variant this lead's role calls for. On by
+    # default because that is what the templates already promise the reader --
+    # they say "attached" in the body -- and off is the deliberate exception.
+    attach_resume = models.BooleanField(default=True)
+
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
     scheduled_for = models.DateTimeField(blank=True, null=True)
     sent_at = models.DateTimeField(blank=True, null=True)
@@ -351,3 +362,34 @@ class Task(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class EmailAttachment(models.Model):
+    """A file that goes out with an OutreachEmail.
+
+    Stored as a raw Cloudinary resource rather than through the default media
+    storage, which is configured for images. A PDF happens to survive that path
+    because Cloudinary treats PDFs as images, but a .docx or a .zip does not,
+    and an attachment feature that silently only works for some file types is
+    worse than none.
+
+    Deleting the email deletes the rows; the files themselves are left to
+    Cloudinary's own lifecycle, the same as every other upload here.
+    """
+
+    email = models.ForeignKey(
+        OutreachEmail, on_delete=models.CASCADE, related_name='attachments'
+    )
+    file = models.FileField(upload_to='email_attachments/', storage=_attachment_storage)
+    # Kept alongside the file because the stored name is mangled for uniqueness,
+    # and the recipient should see what the sender picked, not a slug.
+    filename = models.CharField(max_length=255)
+    content_type = models.CharField(max_length=120, blank=True)
+    size = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return '%s (%s)' % (self.filename, self.email_id)

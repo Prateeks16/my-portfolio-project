@@ -263,6 +263,32 @@ mail is unconfigured or the transport is down, the message is still in the Inbox
 The IMAP sync skips messages sent from your own address, so these notifications do
 not come back round as duplicates on the Mail screen.
 
+### Attachments
+
+Two kinds, and from the recipient's side no difference between them.
+
+**The résumé** attaches itself. `suggest_resume()` reads the lead's role and picks the
+backend/SDE or the AI/ML variant, and Compose shows which one is going out with a
+checkbox to suppress it. The two files live on the Profile record — upload them in
+Django admin as `resume_pdf` (backend, and also the public download on the portfolio)
+and `resume_pdf_ai_ml`. **If the AI/ML one is not uploaded, the backend résumé is sent
+instead** rather than nothing, so a missing upload is quiet — worth checking once.
+
+**Anything else** is uploaded per-draft in Compose. Files are stored as Cloudinary raw
+resources, not media, because the media storage assumes images: a PDF survives that
+path since Cloudinary treats PDFs as images, but a `.docx` or `.zip` does not.
+
+**Size.** The Gmail API takes the whole message as base64 inside a 5 MB JSON request,
+so the practical ceiling is about **3.7 MB** of files — well below Gmail's own 25 MB,
+which needs a different upload endpoint. This is checked twice: when a file is picked,
+and again before the send, so it is refused early rather than after the message has
+been written.
+
+If a file cannot be read at send time — Cloudinary being unreachable, say — the send
+is abandoned and the draft kept, with a 400 rather than a failure. A message whose
+body says "my résumé is attached" arriving with nothing attached is worse than one
+that was not sent.
+
 ### Keeping the inbox current
 
 The Mail screen syncs itself when you open it and the last run is more than three

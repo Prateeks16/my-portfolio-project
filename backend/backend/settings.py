@@ -4,6 +4,7 @@ Fixed for Windows & Render Deployment
 """
 
 import os
+import sys
 import dj_database_url
 from pathlib import Path
 
@@ -172,9 +173,23 @@ CLOUDINARY_STORAGE = {
     'API_SECRET': os.environ.get('CLOUD_API_SECRET')
 }
 
+# Under `manage.py test`, every upload goes to memory instead of Cloudinary.
+# Without this a test that saves a FileField makes a real, signed API call --
+# which fails outright with no credentials, and would otherwise litter the
+# production media library with fixtures. Tests must not touch live services.
+_TESTING = 'test' in sys.argv
+
 STORAGES = {
     "default": {
-        "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
+        "BACKEND": "django.core.files.storage.InMemoryStorage" if _TESTING
+        else "cloudinary_storage.storage.MediaCloudinaryStorage",
+    },
+    # Email attachments are arbitrary files. Cloudinary's media storage assumes
+    # images -- a PDF survives it because Cloudinary treats PDFs as images, but
+    # a .docx or .zip does not, so those need the raw resource type.
+    "attachments": {
+        "BACKEND": "django.core.files.storage.InMemoryStorage" if _TESTING
+        else "cloudinary_storage.storage.RawMediaCloudinaryStorage",
     },
     "staticfiles": {
         "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
