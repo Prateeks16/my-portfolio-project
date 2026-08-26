@@ -250,16 +250,35 @@ class GmailAPITransportTest(TestCase):
         gmail_api.reset_token_cache()
         self.addCleanup(gmail_api.reset_token_cache)
         self.calls = []
+        # What Gmail rewrites the Message-ID to. Deliberately unlike anything
+        # make_msgid would produce, so a test cannot pass by accident.
+        self.gmail_message_id = '<CAMWrOazsHapZVJeaqesW7Mat@mail.gmail.com>'
 
-    def _fake_post(self, url, payload, headers=None, form=False):
-        self.calls.append((url, payload, headers))
+    def _fake_request(self, url, method='POST', payload=None, headers=None, form=False):
+        self.calls.append((url, method, payload, headers))
         if url == gmail_api.TOKEN_URL:
             return {'access_token': 'access-token', 'expires_in': 3600}
-        return {'id': 'gmail-msg-1', 'threadId': 'gmail-thread-1'}
+        if url == gmail_api.SEND_URL:
+            return {'id': 'gmail-msg-1', 'threadId': 'gmail-thread-1'}
+        if url.startswith(gmail_api.MESSAGES_URL):
+            return {'payload': {'headers': [
+                {'name': 'Subject', 'value': 'Backend role'},
+                {'name': 'Message-Id', 'value': self.gmail_message_id},
+            ]}}
+        raise AssertionError('unexpected call to %s' % url)
+
+    def _patch(self, **kwargs):
+        kwargs.setdefault('side_effect', self._fake_request)
+        return mock.patch.object(gmail_api, '_request', **kwargs)
+
+    def _calls_to(self, url, method=None):
+        return [c for c in self.calls
+                if c[0] == url and (method is None or c[1] == method)]
 
     def _sent_mime(self):
-        raw = [p for url, p, _ in self.calls if url == gmail_api.SEND_URL][0]['raw']
-        return base64.urlsafe_b64decode(raw).decode('utf-8')
+        return base64.urlsafe_b64decode(
+            self._calls_to(gmail_api.SEND_URL)[0][2]['raw']
+        ).decode('utf-8')
 
     def test_send_carries_the_same_headers_as_the_smtp_path(self):
         lead = Lead.objects.create(
@@ -270,17 +289,13 @@ class GmailAPITransportTest(TestCase):
             subject='Backend role', body='Hi Priya,\n\nQuick note.',
             in_reply_to='<earlier@acme-hire.com>',
         )
-        with mock.patch.object(gmail_api, '_post', side_effect=self._fake_post):
+        with self._patch():
             send_outreach_email(outreach)
 
         outreach.refresh_from_db()
         mime = self._sent_mime()
 
-        # The contract the reply matching depends on: the Message-ID that went
-        # out is the one stored, and the thread references survive the trip
-        # through base64.
-        self.assertTrue(outreach.message_id.startswith('<'))
-        self.assertIn('Message-ID: %s' % outreach.message_id, mime)
+        # The thread references survive the trip through base64.
         self.assertIn('In-Reply-To: <earlier@acme-hire.com>', mime)
         self.assertIn('References: <earlier@acme-hire.com>', mime)
         self.assertIn('Prateek Sahu <me@gmail.com>', mime)
@@ -291,15 +306,86 @@ class GmailAPITransportTest(TestCase):
         self.assertEqual(lead.stage, 'contacted')
 
         # Bearer token on the send, and it came from the refresh exchange.
-        send_call = [c for c in self.calls if c[0] == gmail_api.SEND_URL][0]
-        self.assertEqual(send_call[2]['Authorization'], 'Bearer access-token')
+        self.assertEqual(
+            self._calls_to(gmail_api.SEND_URL)[0][3]['Authorization'],
+            'Bearer access-token',
+        )
+
+    def test_the_stored_message_id_is_the_one_gmail_actually_wrote(self):
+        outreach = OutreachEmail.objects.create(
+            to_email='priya@acme-hire.com', subject='Backend role', body='...',
+        )
+        with self._patch():
+            send_outreach_email(outreach)
+        outreach.refresh_from_db()
+
+        # Gmail discards the Message-ID it is handed and writes its own. Storing
+        # the locally minted one would mean every reply quotes an id the CRM has
+        # never heard of, and reply matching silently degrades to the address
+        # fallback -- which loses which *email* was being answered.
+        self.assertEqual(outreach.message_id, self.gmail_message_id)
+        self.assertNotIn(self.gmail_message_id, self._sent_mime())
+
+        # Read back by id, metadata only -- never the body.
+        read = self._calls_to(
+            '%s/gmail-msg-1?format=metadata&metadataHeaders=Message-Id'
+            % gmail_api.MESSAGES_URL, method='GET',
+        )
+        self.assertEqual(len(read), 1)
+
+    def test_a_reply_matches_the_id_gmail_wrote_not_the_one_minted(self):
+        lead = Lead.objects.create(
+            name='Priya Mehta', email='priya@acme-hire.com', stage='new',
+        )
+        outreach = OutreachEmail.objects.create(
+            lead=lead, to_email=lead.email, subject='Backend role', body='...',
+        )
+        with self._patch():
+            send_outreach_email(outreach)
+
+        # The recipient answers quoting what their client saw, which is Gmail's
+        # id. This is the end-to-end claim the read-back exists to protect.
+        raw = REPLY % (
+            self.gmail_message_id.encode(), self.gmail_message_id.encode(),
+        )
+        record, created, matched = _store(
+            email_mod.message_from_bytes(raw), 'me@gmail.com'
+        )
+
+        self.assertTrue(created and matched)
+        self.assertEqual(record.replies_to_id, outreach.id)
+        lead.refresh_from_db()
+        self.assertEqual(lead.stage, 'replied')
+
+    def test_a_failed_read_back_keeps_the_send_and_the_minted_id(self):
+        outreach = OutreachEmail.objects.create(
+            to_email='x@y.com', subject='s', body='b',
+        )
+
+        def refuse_the_read(url, method='POST', payload=None, headers=None, form=False):
+            if url.startswith(gmail_api.MESSAGES_URL) and method == 'GET':
+                raise gmail_api.GmailAuthError(
+                    'Request had insufficient authentication scopes.'
+                )
+            return self._fake_request(url, method, payload, headers, form)
+
+        with self._patch(side_effect=refuse_the_read):
+            send_outreach_email(outreach)
+        outreach.refresh_from_db()
+
+        # A token minted before gmail.metadata was requested returns 403 here.
+        # The message is already gone by then, so this must not fail the send --
+        # it degrades to the old behaviour and nothing else.
+        self.assertEqual(outreach.status, 'sent')
+        self.assertTrue(outreach.message_id.startswith('<'))
+        self.assertNotEqual(outreach.message_id, self.gmail_message_id)
 
     def test_the_access_token_is_minted_once_and_reused(self):
         drafts = [
             OutreachEmail.objects.create(to_email='a@b.com', subject='s', body='b'),
             OutreachEmail.objects.create(to_email='c@d.com', subject='s', body='b'),
         ]
-        with mock.patch.object(gmail_api, '_post', side_effect=self._fake_post):
+        with self._patch():
             for draft in drafts:
                 send_outreach_email(draft)
 
@@ -313,7 +399,7 @@ class GmailAPITransportTest(TestCase):
             to_email='x@y.com', subject='s', body='b',
         )
         failure = gmail_api.GmailAuthError('Token has been expired or revoked. (invalid_grant)')
-        with mock.patch.object(gmail_api, '_post', side_effect=failure):
+        with self._patch(side_effect=failure):
             response = self.client.post('/api/crm/emails/%d/send/' % draft.id)
 
         # Same handling as a rejected App Password: a configuration problem, so
@@ -337,7 +423,7 @@ class GmailAPITransportTest(TestCase):
             to_email='x@y.com', subject='s', body='b',
         )
         failure = gmail_api.GmailAPIError('Gmail API returned 500: Backend Error')
-        with mock.patch.object(gmail_api, '_post', side_effect=failure):
+        with self._patch(side_effect=failure):
             response = self.client.post('/api/crm/emails/%d/send/' % draft.id)
 
         self.assertEqual(response.status_code, 502)
@@ -373,6 +459,10 @@ class GmailAPITransportTest(TestCase):
         # from a bug in the exchange until you read Google's docs closely.
         self.assertEqual(query['access_type'], ['offline'])
         self.assertEqual(query['prompt'], ['consent'])
-        # Sending only. Widening this scope would make the refresh token able to
-        # read the mailbox, which it has no reason to do.
-        self.assertEqual(query['scope'], ['https://www.googleapis.com/auth/gmail.send'])
+        # Sending, plus headers-only metadata for the Message-ID read-back.
+        # Neither gmail.readonly nor gmail.modify: a leaked refresh token must
+        # not be able to read the mail itself.
+        self.assertEqual(query['scope'], [
+            'https://www.googleapis.com/auth/gmail.send '
+            'https://www.googleapis.com/auth/gmail.metadata'
+        ])

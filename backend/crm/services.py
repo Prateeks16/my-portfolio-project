@@ -68,9 +68,11 @@ def send_outreach_email(email):
     are present. Drafting never touches this function.
 
     The message is stamped with a Message-ID that is saved alongside the row,
-    which is what lets an inbound reply be matched back to it. When the email
-    answers something, In-Reply-To and References go out with it so Gmail files
-    it in the existing conversation instead of starting a new one.
+    which is what lets an inbound reply be matched back to it. Gmail overwrites
+    that header with its own, so what gets saved is the value read back after
+    the send, not the one minted before it. When the email answers something,
+    In-Reply-To and References go out with it so Gmail files it in the existing
+    conversation instead of starting a new one.
     """
     if not mail_is_configured():
         raise MailNotConfigured(_not_configured_message())
@@ -128,6 +130,14 @@ def send_outreach_email(email):
             'GMAIL_REFRESH_TOKEN in the backend environment. Original error: %s'
             % (address, exc)
         ) from exc
+
+    # Gmail overwrites the Message-ID header on send, so the value minted above
+    # is not the one the recipient's client will quote back in In-Reply-To.
+    # When the transport can tell us what actually went out, that is what gets
+    # stored -- otherwise every reply would fail to match the email it answers.
+    actual_message_id = getattr(message, 'sent_message_id', '')
+    if actual_message_id:
+        email.message_id = actual_message_id
 
     email.status = 'sent'
     email.sent_at = timezone.now()

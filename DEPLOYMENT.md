@@ -218,9 +218,21 @@ Which one is in use is a single environment variable and nothing above it change
 the same message, the same `Message-ID`, the same threading headers, the same
 behaviour on failure.
 
-Every outgoing message is stamped with a `Message-ID` that is stored before
-transmission. Replies to it carry `In-Reply-To` and `References`, so Gmail files them
-in the existing conversation on both sides.
+**Threading.** Every outgoing message is stamped with a `Message-ID`, and replies
+carry `In-Reply-To` and `References` so Gmail files them in the existing conversation
+on both sides.
+
+One wrinkle worth knowing about: **Gmail does not keep the `Message-ID` you give it.**
+It overwrites the header with one of its own — over SMTP just as much as over the API.
+So the id minted locally before a send is not what the recipient sees, and not what
+their client quotes when they reply. Storing the local value would mean every reply
+fails to match the email it answers.
+
+The fix is one metadata-only read after each send, asking Gmail which id it actually
+wrote, and storing that. This is the only reason `gmail.metadata` is requested. If
+that read fails — a token minted before the scope was added returns 403 — the send
+still succeeds and matching falls back to the sender's address, which links the reply
+to the right **lead** but not to the specific email. Re-mint the token to fix it.
 
 **Receiving** pulls over IMAP into the CRM's Mail screen. Gmail stays the system of
 record: the mailbox is opened read-only and fetched with `BODY.PEEK`, so a sync
@@ -288,9 +300,18 @@ and enable it.
 
 **2. OAuth consent screen.** *APIs & Services → OAuth consent screen*. User type
 **External**. Fill in app name and your own address for both support and developer
-contact. Add the scope `https://www.googleapis.com/auth/gmail.send` — that one only;
-nothing here reads the mailbox, IMAP still does that. Add your own Gmail address as a
-**test user**.
+contact. Add exactly two scopes:
+
+- `https://www.googleapis.com/auth/gmail.send` — the send itself
+- `https://www.googleapis.com/auth/gmail.metadata` — headers only, read-only, used
+  once per send to read back the Message-ID Gmail wrote (see *Threading* below)
+
+Not `gmail.readonly` and not `gmail.modify`. Neither is needed: IMAP does the reading
+with the App Password, and keeping them off means a leaked refresh token can send but
+never read your mail.
+
+Add the sending account — the same address as `EMAIL_HOST_USER`, not your personal
+one — as a **test user**.
 
 > Leaving the app in **Testing** status expires the refresh token after **7 days**,
 > and sending starts failing with `invalid_grant`. Press **Publish app** to move it
@@ -340,7 +361,7 @@ is untouched and remains the default.
 | `[Errno 101] Network is unreachable` on send | The host blocks outbound SMTP — switch `EMAIL_BACKEND` to the Gmail API |
 | `Token has been expired or revoked (invalid_grant)` | Refresh token dead. Usually the 7-day Testing-status expiry; publish the app, then re-run `gmail_authorize` |
 | `Gmail API sending is selected but not configured` | `EMAIL_BACKEND` points at the Gmail backend but a `GMAIL_*` variable is missing |
-| `Request had insufficient authentication scopes` | The client was authorized without `gmail.send` — re-run `gmail_authorize` |
+| `Request had insufficient authentication scopes` | Token predates the `gmail.metadata` scope. Sending still works; only the Message-ID read-back is skipped. Add the scope on the consent screen, then re-run `gmail_authorize` |
 
 ---
 

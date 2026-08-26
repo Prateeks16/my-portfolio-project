@@ -46,12 +46,20 @@ BACKEND_PATH = 'crm.gmail_api.GmailAPIBackend'
 
 AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
 TOKEN_URL = 'https://oauth2.googleapis.com/token'
-SEND_URL = 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send'
+MESSAGES_URL = 'https://gmail.googleapis.com/gmail/v1/users/me/messages'
+SEND_URL = MESSAGES_URL + '/send'
 
-# The narrowest scope that can send. Deliberately not gmail.readonly or
-# gmail.modify: nothing here reads the mailbox -- IMAP still does that, with
-# the App Password -- so a leaked refresh token can send, and nothing else.
-SCOPES = ['https://www.googleapis.com/auth/gmail.send']
+# gmail.send is what actually sends. gmail.metadata is read-only and headers
+# only -- no bodies, no attachments -- and exists solely to read back the
+# Message-ID Gmail stamps on a sent message; see read_sent_message_id.
+#
+# Deliberately not gmail.readonly or gmail.modify, which would let a leaked
+# refresh token read the mail itself. IMAP still does the reading, with the App
+# Password, and that stays separate on purpose.
+SCOPES = [
+    'https://www.googleapis.com/auth/gmail.send',
+    'https://www.googleapis.com/auth/gmail.metadata',
+]
 
 # What Google says when the credential itself is the problem. A refresh token
 # dies on a password change, on revocation, and -- for an OAuth app still in
@@ -132,19 +140,24 @@ def _error_detail(exc):
     return raw.strip() or str(exc)
 
 
-def _post(url, payload, headers=None, form=False):
-    """POST JSON (or a form) and return the parsed response."""
-    if form:
+def _request(url, method='POST', payload=None, headers=None, form=False):
+    """Perform one HTTP call and return the parsed JSON response.
+
+    The single place this module touches the network, which is what makes it
+    the single place to stub in tests.
+    """
+    request_headers = dict(headers or {})
+    if payload is None:
+        body = None
+    elif form:
         body = urllib.parse.urlencode(payload).encode('utf-8')
-        content_type = 'application/x-www-form-urlencoded'
+        request_headers.setdefault('Content-Type', 'application/x-www-form-urlencoded')
     else:
         body = json.dumps(payload).encode('utf-8')
-        content_type = 'application/json'
+        request_headers.setdefault('Content-Type', 'application/json')
 
-    request_headers = {'Content-Type': content_type}
-    request_headers.update(headers or {})
     request = urllib.request.Request(
-        url, data=body, headers=request_headers, method='POST'
+        url, data=body, headers=request_headers, method=method
     )
     try:
         with urllib.request.urlopen(request, timeout=_timeout()) as response:
@@ -173,6 +186,14 @@ def _post(url, payload, headers=None, form=False):
         raise GmailAPIError(
             'Gmail API returned a response that is not JSON: %r' % raw[:200]
         ) from exc
+
+
+def _post(url, payload, headers=None, form=False):
+    return _request(url, 'POST', payload=payload, headers=headers, form=form)
+
+
+def _get(url, headers=None):
+    return _request(url, 'GET', headers=headers)
 
 
 # Access tokens last an hour. Refreshing before every send would add a round
@@ -286,12 +307,61 @@ def send_raw(mime_bytes):
         )
 
 
+def read_sent_message_id(api_id):
+    """Read back the Message-ID Gmail actually stamped on a message it sent.
+
+    Gmail does not honour a Message-ID supplied by the sender -- it overwrites
+    the header with one of its own, over SMTP just as much as over this API. So
+    the value minted locally before the send is *not* what the recipient sees,
+    and it is not what their client will quote in In-Reply-To when they reply.
+    Storing the local value would quietly break reply matching.
+
+    One metadata-only read closes that gap: ask Gmail for the header it wrote.
+
+    Returns '' rather than raising. The send has already happened by this point
+    and cannot be unhappened, so a failure here must never turn a delivered
+    message into an error. It also degrades cleanly for a refresh token minted
+    before gmail.metadata was requested -- that returns 403, is caught, and
+    leaves the locally minted id in place exactly as before.
+    """
+    if not api_id:
+        return ''
+    url = '%s/%s?%s' % (MESSAGES_URL, urllib.parse.quote(str(api_id)),
+                        urllib.parse.urlencode({
+                            'format': 'metadata',
+                            'metadataHeaders': 'Message-Id',
+                        }))
+    try:
+        data = _get(url, headers={'Authorization': 'Bearer %s' % access_token()})
+    except GmailAPIError as exc:
+        logger.warning(
+            'Could not read back the Message-ID for sent message %s: %s. '
+            'Reply matching will fall back to the sender address. If this says '
+            'insufficient scopes, re-run "manage.py gmail_authorize" to pick up '
+            'gmail.metadata.', api_id, exc,
+        )
+        return ''
+
+    headers = (data.get('payload') or {}).get('headers') or []
+    for header in headers:
+        # Gmail answers with the capitalisation it feels like, and RFC 5322
+        # header names are case-insensitive anyway.
+        if header.get('name', '').lower() == 'message-id':
+            return (header.get('value') or '').strip()
+    return ''
+
+
 class GmailAPIBackend(BaseEmailBackend):
     """Django email backend that sends through the Gmail API.
 
     Stateless: there is no connection to open or close, only an access token,
     which the module caches. Django calls open()/close() around a send, and
     inheriting the base class's no-op versions is the whole implementation.
+
+    Each message that goes out is annotated with `sent_message_id` -- the
+    Message-ID Gmail actually wrote, which is not the one that was handed in.
+    Django's send_messages() contract returns only a count, so an attribute on
+    the message is how that gets back to the caller who needs to store it.
     """
 
     def send_messages(self, email_messages):
@@ -300,11 +370,14 @@ class GmailAPIBackend(BaseEmailBackend):
         sent = 0
         for message in email_messages:
             try:
-                send_raw(flatten(message.message()))
+                result = send_raw(flatten(message.message()))
             except GmailAPIError:
                 if not self.fail_silently:
                     raise
                 logger.exception('Gmail API send failed')
                 continue
+            message.gmail_id = (result or {}).get('id', '')
+            message.gmail_thread_id = (result or {}).get('threadId', '')
+            message.sent_message_id = read_sent_message_id(message.gmail_id)
             sent += 1
         return sent
