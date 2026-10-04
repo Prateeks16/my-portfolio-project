@@ -8,6 +8,10 @@ name: Keep backend warm
 # The public portfolio does not depend on this: its content is baked into the
 # build and cached in the browser. This is belt and braces for the parts that
 # genuinely need a live backend.
+#
+# Backup only. GitHub runs short schedules on a best-effort basis and this one
+# fired every 3-6 hours in practice. The Cloudflare Worker in workers/keep-warm
+# does the real pinging.
 
 on:
   schedule:

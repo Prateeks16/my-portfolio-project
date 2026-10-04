@@ -126,15 +126,27 @@ backend is invisible to visitors.
 the background and stores it in `localStorage`. Repeat visitors see whatever the CRM
 last returned — newer than the snapshot if you have edited content since deploying.
 
-**3. Keep-warm cron.** `.github/workflows/keep-warm.yml` pings
+**3. Keep-warm cron.** A Cloudflare Worker (`workers/keep-warm/`) pings
 `/api/crm/health/` every 10 minutes so the instance never sleeps. The endpoint does no
 database work. This is what keeps the *dashboard* and the *contact form* fast, since
 those genuinely need a live backend.
 
-To enable the cron: it runs automatically once the workflow file is on the default
-branch. Set repository variable `BACKEND_URL` if your backend URL differs from the
-default. GitHub may disable scheduled workflows on repositories with no activity for
-60 days — re-enable from the Actions tab if that happens.
+The Worker has no public URL — it only runs on its cron trigger. To change the
+schedule or the backend URL, edit `workers/keep-warm/wrangler.toml` and redeploy:
+
+```bash
+cd workers/keep-warm
+CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... npx wrangler deploy
+```
+
+The token needs *Account → Workers Scripts: Edit*. Each run's status code and
+latency show under Workers & Pages → `keep-warm` → Logs in the Cloudflare dashboard.
+
+`.github/workflows/keep-warm.yml` does the same ping and stays as a backup, but do not
+rely on it: GitHub treats short schedules as best effort, and in practice it fired
+every 3–6 hours rather than every 10 minutes — far too seldom to beat Render's
+15-minute sleep. GitHub may also disable scheduled workflows on repositories with no
+activity for 60 days.
 
 > Free-tier note: Render gives 750 instance-hours per month, and a month is about 730
 > hours. One always-on free service fits. A second one will not.

@@ -1,0 +1,15 @@
+name = "keep-warm"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+# Cron-only: no public URL.
+workers_dev = false
+
+[triggers]
+crons = ["*/10 * * * *"]
+
+[vars]
+HEALTH_URL = "https://my-portfolio-backend-awei.onrender.com/api/crm/health/"
+
+[observability]
+enabled = true
