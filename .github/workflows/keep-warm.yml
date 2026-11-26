@@ -10,8 +10,11 @@ name: Keep backend warm
 # genuinely need a live backend.
 #
 # Backup only. GitHub runs short schedules on a best-effort basis and this one
-# fired every 3-6 hours in practice. The Cloudflare Worker in workers/keep-warm
+# fired every 3-12 hours in practice. The Cloudflare Worker in workers/keep-warm
 # does the real pinging.
+#
+# GitHub also turns a schedule off after 60 days without activity in the
+# repository, so this needs a commit at least every two months to keep firing.
 
 on:
   schedule:
